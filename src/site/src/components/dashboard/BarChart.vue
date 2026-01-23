@@ -65,8 +65,8 @@ const chartOptions = computed(() => ({
       cornerRadius: 10,
       displayColors: true,
       callbacks: {
-        label: (context: { parsed: { y: number }; dataset: { label?: string } }) => {
-          const value = context.parsed.y
+        label: (context: { parsed: { y: number | null }; dataset: { label?: string } }) => {
+          const value = context.parsed.y ?? 0
           return ` ${context.dataset.label}: ¥${value.toLocaleString()}`
         }
       }

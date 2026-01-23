@@ -38,7 +38,7 @@ const handleSort = (key: string) => {
   }
 }
 
-const getValueColor = (value: string | number, key: string) => {
+const getValueColor = (value: string | number | undefined, key: string) => {
   if ((key === 'total' || key === 'price') && typeof value === 'number') {
     if (value >= 200000) return 'text-emerald-600 font-semibold'
     if (value >= 100000) return 'text-blue-600'
@@ -56,11 +56,11 @@ const getStatusClass = (status: string) => {
   }
 }
 
-const formatNumber = (value: string | number) => {
+const formatNumber = (value: string | number | undefined) => {
   if (typeof value === 'number') {
     return value.toLocaleString()
   }
-  return value
+  return value ?? ''
 }
 </script>
 

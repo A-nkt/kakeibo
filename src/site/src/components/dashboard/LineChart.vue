@@ -31,12 +31,13 @@ const props = withDefaults(defineProps<Props>(), {
 const chartData = computed(() => ({
   labels: props.labels,
   datasets: props.datasets.map((dataset, index) => {
+    const defaultColor = { line: 'rgb(99, 102, 241)', bg: 'rgba(99, 102, 241, 0.1)' }
     const colors = [
-      { line: 'rgb(99, 102, 241)', bg: 'rgba(99, 102, 241, 0.1)' },
+      defaultColor,
       { line: 'rgb(16, 185, 129)', bg: 'rgba(16, 185, 129, 0.1)' },
       { line: 'rgb(245, 158, 11)', bg: 'rgba(245, 158, 11, 0.1)' }
     ]
-    const color = colors[index % colors.length]
+    const color = colors[index % colors.length] ?? defaultColor
     return {
       label: dataset.label,
       data: dataset.data,
