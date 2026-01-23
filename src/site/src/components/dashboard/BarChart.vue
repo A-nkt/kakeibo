@@ -12,7 +12,6 @@ import {
 } from 'chart.js'
 import type { ChartDataset } from '@/types/dashboard'
 
-// Chart.js のスケール、要素、プラグインを登録
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
 interface Props {
@@ -27,38 +26,67 @@ const props = withDefaults(defineProps<Props>(), {
   showLegend: true
 })
 
-// Chart.js 用のデータ構造を構築
 const chartData = computed(() => ({
   labels: props.labels,
   datasets: props.datasets.map((dataset) => ({
     label: dataset.label,
     data: dataset.data,
-    backgroundColor: dataset.backgroundColor ?? 'rgba(59, 130, 246, 0.5)',
-    borderColor: dataset.borderColor ?? 'rgb(59, 130, 246)',
-    borderWidth: dataset.borderWidth ?? 1
+    backgroundColor: 'hsla(230, 70%, 55%, 0.8)',
+    borderColor: 'hsla(230, 70%, 55%, 1)',
+    borderWidth: 0,
+    borderRadius: 6,
+    borderSkipped: false,
+    hoverBackgroundColor: 'hsla(230, 70%, 45%, 0.9)'
   }))
 }))
 
-// Chart.js オプション（レスポンシブ設定を有効化）
 const chartOptions = computed(() => ({
   responsive: true,
   maintainAspectRatio: true,
+  animation: {
+    duration: 800,
+    easing: 'easeOutQuart' as const
+  },
   plugins: {
     legend: {
-      display: props.showLegend
+      display: false
     },
     title: {
       display: !!props.title,
-      text: props.title
+      text: props.title,
+      font: { size: 16, weight: 600 },
+      padding: { bottom: 20 }
+    },
+    tooltip: {
+      backgroundColor: 'rgba(17, 24, 39, 0.95)',
+      titleFont: { size: 14, weight: 600 },
+      bodyFont: { size: 13 },
+      padding: 14,
+      cornerRadius: 10,
+      displayColors: true,
+      callbacks: {
+        label: (context: { parsed: { y: number }; dataset: { label?: string } }) => {
+          const value = context.parsed.y
+          return ` ${context.dataset.label}: ¥${value.toLocaleString()}`
+        }
+      }
     }
   },
   scales: {
     x: {
-      display: true
+      display: true,
+      grid: { display: false },
+      ticks: { font: { size: 11 }, color: '#6B7280' }
     },
     y: {
       display: true,
-      beginAtZero: true
+      beginAtZero: true,
+      grid: { color: 'rgba(229, 231, 235, 0.4)', drawBorder: false },
+      ticks: {
+        font: { size: 11 },
+        color: '#6B7280',
+        callback: (value: number | string) => `¥${Number(value).toLocaleString()}`
+      }
     }
   }
 }))
@@ -66,6 +94,6 @@ const chartOptions = computed(() => ({
 
 <template>
   <div class="w-full">
-    <Bar :data="chartData" :options="chartOptions" />
+    <Bar ref="chartRef" :data="chartData" :options="chartOptions" />
   </div>
 </template>
