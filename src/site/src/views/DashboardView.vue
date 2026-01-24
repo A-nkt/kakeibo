@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useAuth } from '@/composables/useAuth'
 import DataTable from '@/components/dashboard/DataTable.vue'
 import BarChart from '@/components/dashboard/BarChart.vue'
 import StatCard from '@/components/dashboard/StatCard.vue'
@@ -16,17 +16,12 @@ import {
   stats
 } from '@/data/sampleData'
 
-const router = useRouter()
+const { currentUser, logout } = useAuth()
 const isLoaded = ref(false)
 const chartPeriod = ref<'daily' | 'weekly' | 'monthly'>('daily')
 const isUserMenuOpen = ref(false)
-const userEmail = ref(localStorage.getItem('userEmail') || 'user@example.com')
 
-const handleLogout = () => {
-  localStorage.removeItem('isLoggedIn')
-  localStorage.removeItem('userEmail')
-  router.push('/login')
-}
+const userEmail = computed(() => currentUser.value?.email || localStorage.getItem('userEmail') || 'user@example.com')
 
 onMounted(() => {
   setTimeout(() => {
@@ -97,7 +92,7 @@ const statsGridClass = computed(() => {
                 <p class="truncate text-sm font-medium text-gray-900">{{ userEmail }}</p>
               </div>
               <button
-                @click="handleLogout"
+                @click="logout"
                 class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100"
               >
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
