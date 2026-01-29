@@ -7,15 +7,8 @@ Parameters:
     Default: dev
     AllowedValues:
       - dev
+      - stg
       - prod
-  GoogleClientIdParam:
-    Type: String
-    Default: /app/google/client-id
-    Description: SSM Parameter name for Google OAuth Client ID
-  GoogleClientSecretParam:
-    Type: String
-    Default: /app/google/client-secret
-    Description: SSM Parameter name for Google OAuth Client Secret
   CallbackUrl:
     Type: String
     Default: http://localhost:3000/auth/callback
@@ -29,7 +22,7 @@ Resources:
   UserPool:
     Type: AWS::Cognito::UserPool
     Properties:
-      UserPoolName: !Sub ${AWS::StackName}-user-pool
+      UserPoolName: !Sub ${Environment}-${AWS::StackName}-user-pool
       AutoVerifiedAttributes:
         - email
       UsernameAttributes:
@@ -52,7 +45,7 @@ Resources:
   UserPoolDomain:
     Type: AWS::Cognito::UserPoolDomain
     Properties:
-      Domain: !Sub ${AWS::StackName}-${AWS::AccountId}
+      Domain: !Sub ${Environment}-${AWS::AccountId}
       UserPoolId: !Ref UserPool
 
   GoogleIdentityProvider:
@@ -62,20 +55,19 @@ Resources:
       ProviderName: Google
       ProviderType: Google
       ProviderDetails:
-        client_id: !Sub '{{resolve:ssm-secure:${GoogleClientIdParam}}}'
-        client_secret: !Sub '{{resolve:ssm-secure:${GoogleClientSecretParam}}}'
+        client_id: '{{resolve:ssm:/dev/app/google/client-id}}'
+        client_secret: '{{resolve:ssm:/dev/app/google/client-secret}}'
         authorize_scopes: openid email profile
       AttributeMapping:
         email: email
         name: name
-        picture: picture
         username: sub
 
   UserPoolClient:
     Type: AWS::Cognito::UserPoolClient
     DependsOn: GoogleIdentityProvider
     Properties:
-      ClientName: !Sub ${AWS::StackName}-client
+      ClientName: !Sub ${Environment}-${AWS::StackName}-client
       UserPoolId: !Ref UserPool
       GenerateSecret: false
       ExplicitAuthFlows:
@@ -110,10 +102,10 @@ Outputs:
 
   CognitoDomain:
     Description: Cognito Hosted UI Domain
-    Value: !Sub ${AWS::StackName}-${AWS::AccountId}.auth.${AWS::Region}.amazoncognito.com
+    Value: !Sub ${Environment}-${AWS::AccountId}.auth.${AWS::Region}.amazoncognito.com
     Export:
       Name: !Sub ${AWS::StackName}-CognitoDomain
 
   GoogleIdpResponseUrl:
     Description: URL to set in Google Cloud Console as redirect URI
-    Value: !Sub https://${AWS::StackName}-${AWS::AccountId}.auth.${AWS::Region}.amazoncognito.com/oauth2/idpresponse
+    Value: !Sub https://${Environment}-${AWS::AccountId}.auth.${AWS::Region}.amazoncognito.com/oauth2/idpresponse

@@ -1,9 +1,10 @@
 #!/bin/bash
-set -e
+APP_BASE=`git rev-parse --show-toplevel`
+. ${APP_BASE}/env/env.sh
+
 
 if [ $# -lt 2 ]; then
-  echo "Usage: $0 <parameter-name> <parameter-value>"
-  echo "Example: $0 /app/google/client-id your-client-id"
+  echo "Usage: <parameter-name> <parameter-value>"
   exit 1
 fi
 
@@ -13,6 +14,8 @@ PARAM_VALUE=$2
 aws ssm put-parameter \
   --name "$PARAM_NAME" \
   --value "$PARAM_VALUE" \
-  --type SecureString
+  --type String \
+  --profile ${ProfilePrefix}_dev \
+  --region ${Region}
 
 echo "Parameter '$PARAM_NAME' registered successfully."
