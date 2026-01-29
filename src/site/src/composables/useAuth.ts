@@ -98,8 +98,8 @@ export function useAuth() {
     localStorage.removeItem('isLoggedIn')
     localStorage.removeItem('userEmail')
 
-    // ログインページにリダイレクト
-    router.push('/login')
+    // Cognitoからもログアウト
+    window.location.href = getLogoutUrl()
   }
 
   return {
