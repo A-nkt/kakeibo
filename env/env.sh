@@ -48,7 +48,8 @@ function deploy () {
         --capabilities CAPABILITY_NAMED_IAM \
         --parameter-overrides ${_PARAMS[@]} \
         --region ${DeployRegion} \
-        --profile ${Profile}
+        --profile ${Profile} \
+        --s3-bucket ${Environment}-app-infra-store-bucket
 }
 
 init
