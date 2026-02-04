@@ -17,11 +17,38 @@ import {
 } from '@/data/sampleData'
 
 const { currentUser, logout } = useAuth()
+
 const isLoaded = ref(false)
 const chartPeriod = ref<'daily' | 'weekly' | 'monthly'>('daily')
 const isUserMenuOpen = ref(false)
 
+// スライドオーバー関連
+const isSlideOverOpen = ref(false)
+const isSubmitting = ref(false)
+const showSuccess = ref(false)
+const selectedProduct = ref('')
+const price = ref<number | null>(null)
+
+// ダミー商品データ
+const products = [
+  { id: 'prod-001', name: 'クラウドストレージ Basic' },
+  { id: 'prod-002', name: 'クラウドストレージ Pro' },
+  { id: 'prod-003', name: 'データ分析ツール' },
+  { id: 'prod-004', name: 'セキュリティパッケージ' },
+  { id: 'prod-005', name: 'API連携サービス' },
+  { id: 'prod-006', name: 'バックアップソリューション' },
+]
+
 const userEmail = computed(() => currentUser.value?.email || localStorage.getItem('userEmail') || 'user@example.com')
+
+const isFormValid = computed(() => {
+  return selectedProduct.value !== '' && price.value !== null && price.value > 0
+})
+
+const formattedPrice = computed(() => {
+  if (price.value === null) return ''
+  return new Intl.NumberFormat('ja-JP').format(price.value)
+})
 
 onMounted(() => {
   setTimeout(() => {
@@ -51,6 +78,32 @@ const statsGridClass = computed(() => {
   }
   return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'
 })
+
+const openSlideOver = () => {
+  isSlideOverOpen.value = true
+}
+
+const closeSlideOver = () => {
+  isSlideOverOpen.value = false
+  showSuccess.value = false
+}
+
+const handleSubmit = async () => {
+  if (!isFormValid.value) return
+  
+  isSubmitting.value = true
+  await new Promise(resolve => setTimeout(resolve, 1000))
+  
+  isSubmitting.value = false
+  showSuccess.value = true
+  
+  setTimeout(() => {
+    showSuccess.value = false
+    selectedProduct.value = ''
+    price.value = null
+    closeSlideOver()
+  }, 1500)
+}
 </script>
 
 <template>
@@ -196,6 +249,155 @@ const statsGridClass = computed(() => {
         </div>
       </div>
     </main>
+
+    <!-- FAB (Floating Action Button) -->
+    <button
+      @click="openSlideOver"
+      class="fab-button fixed bottom-8 right-8 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg transition-all hover:scale-110 hover:shadow-xl active:scale-95"
+    >
+      <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+      </svg>
+    </button>
+
+    <!-- FAB Tooltip -->
+    <div class="fab-tooltip fixed bottom-10 right-24 z-40 rounded-lg bg-gray-900 px-3 py-1.5 text-sm text-white opacity-0 shadow-lg transition-opacity">
+      項目登録
+    </div>
+
+    <!-- Slide Over Backdrop -->
+    <Transition name="fade">
+      <div
+        v-if="isSlideOverOpen"
+        class="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm"
+        @click="closeSlideOver"
+      />
+    </Transition>
+
+    <!-- Slide Over Panel -->
+    <Transition name="slide">
+      <div
+        v-if="isSlideOverOpen"
+        class="fixed inset-y-0 right-0 z-50 w-full max-w-md"
+      >
+        <div class="flex h-full flex-col bg-white shadow-2xl">
+          <!-- Header -->
+          <div class="border-b border-gray-100 bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-5">
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-xl font-semibold text-white">項目登録</h2>
+                <p class="mt-1 text-sm text-indigo-100">新しい項目を追加します</p>
+              </div>
+              <button
+                @click="closeSlideOver"
+                class="rounded-lg p-2 text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+              >
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Form Content -->
+          <div class="flex-1 overflow-y-auto p-6">
+            <!-- Success Message -->
+            <Transition name="fade">
+              <div
+                v-if="showSuccess"
+                class="mb-6 flex items-center gap-3 rounded-xl bg-green-50 p-4 text-green-800"
+              >
+                <div class="flex h-10 w-10 items-center justify-center rounded-full bg-green-100">
+                  <svg class="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div>
+                  <p class="font-medium">登録完了</p>
+                  <p class="text-sm text-green-600">項目が追加されました</p>
+                </div>
+              </div>
+            </Transition>
+
+            <form @submit.prevent="handleSubmit" class="space-y-6">
+              <!-- Product Select -->
+              <div>
+                <label for="product" class="mb-2 block text-sm font-medium text-gray-700">
+                  商品
+                </label>
+                <div class="relative">
+                  <select
+                    id="product"
+                    v-model="selectedProduct"
+                    class="w-full appearance-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 pr-10 text-gray-900 transition-all focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  >
+                    <option value="" disabled>商品を選択</option>
+                    <option v-for="product in products" :key="product.id" :value="product.id">
+                      {{ product.name }}
+                    </option>
+                  </select>
+                  <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                    <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Price Input -->
+              <div>
+                <label for="price" class="mb-2 block text-sm font-medium text-gray-700">
+                  価格
+                </label>
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-500">¥</span>
+                  <input
+                    id="price"
+                    v-model.number="price"
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="0"
+                    class="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 pl-8 pr-4 text-gray-900 transition-all focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                </div>
+                <p v-if="price" class="mt-2 text-sm text-gray-500">
+                  {{ formattedPrice }} 円
+                </p>
+              </div>
+            </form>
+          </div>
+
+          <!-- Footer -->
+          <div class="border-t border-gray-100 bg-gray-50 px-6 py-4">
+            <div class="flex gap-3">
+              <button
+                type="button"
+                @click="closeSlideOver"
+                class="flex-1 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 transition-all hover:bg-gray-50"
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                @click="handleSubmit"
+                :disabled="!isFormValid || isSubmitting"
+                class="flex-1 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-3 text-sm font-medium text-white transition-all hover:from-indigo-700 hover:to-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <span v-if="!isSubmitting">登録する</span>
+                <span v-else class="flex items-center justify-center gap-2">
+                  <svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  登録中...
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -223,5 +425,37 @@ const statsGridClass = computed(() => {
 .animate-slide-up {
   opacity: 0;
   animation: slide-up 0.6s ease-out forwards;
+}
+
+/* FAB hover tooltip */
+.fab-button:hover + .fab-tooltip {
+  opacity: 1;
+}
+
+/* Slide Over Transitions */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.slide-enter-active {
+  transition: transform 0.3s ease-out;
+}
+
+.slide-leave-active {
+  transition: transform 0.2s ease-in;
+}
+
+.slide-enter-from {
+  transform: translateX(100%);
+}
+
+.slide-leave-to {
+  transform: translateX(100%);
 }
 </style>
