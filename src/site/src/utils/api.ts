@@ -37,3 +37,70 @@ export async function getItems(customerId: string) {
 
   return response.json()
 }
+
+// Category API
+export async function getCategories(customerId: string) {
+  const response = await fetch(`${API_BASE_URL}/api/v1/category/list?customer_id=${encodeURIComponent(customerId)}`)
+
+  if (!response.ok) {
+    const errorData = await response.json()
+    throw new Error(errorData.message || 'カテゴリの取得に失敗しました')
+  }
+
+  return response.json()
+}
+
+export async function registCategory(customerId: string, name: string) {
+  const response = await fetch(`${API_BASE_URL}/api/v1/category/regist`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      name,
+    }),
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json()
+    throw new Error(errorData.message || 'カテゴリの登録に失敗しました')
+  }
+
+  return response.json()
+}
+
+export async function deleteCategory(customerId: string, categoryId: string) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/v1/category/delete?customer_id=${encodeURIComponent(customerId)}&category_id=${encodeURIComponent(categoryId)}`,
+    { method: 'DELETE' }
+  )
+
+  if (!response.ok) {
+    const errorData = await response.json()
+    throw new Error(errorData.message || 'カテゴリの削除に失敗しました')
+  }
+
+  return response.json()
+}
+
+export async function updateCategory(customerId: string, categoryId: string, name: string) {
+  const response = await fetch(`${API_BASE_URL}/api/v1/category/update`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      category_id: categoryId,
+      name,
+    }),
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json()
+    throw new Error(errorData.message || 'カテゴリの更新に失敗しました')
+  }
+
+  return response.json()
+}

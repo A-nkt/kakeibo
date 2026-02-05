@@ -27,6 +27,7 @@ app = APIGatewayRestResolver(
 
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(os.environ['TABLE_NAME'])
+category_table = dynamodb.Table(os.environ['CATEGORY_TABLE_NAME'])
 
 
 def decimal_default_proc(obj: Any):
@@ -118,6 +119,140 @@ def get_items() -> Response[str]:
         logger.info('Items retrieved successfully', extra={'count': len(items)})
         return response_result(result=items)
 
+    except ClientError as e:
+        logger.error('DynamoDB error', extra={'error': str(e)})
+        return response_error(502, 'Database error')
+    except Exception as e:
+        logger.error('Internal server error', extra={'error': str(e)})
+        return response_error(500, 'Internal server error')
+
+
+# --------------------------------------------------------------------------------------------------
+# Category API
+# --------------------------------------------------------------------------------------------------
+@app.post('/api/v1/category/regist')
+def post_category() -> Response[str]:
+    try:
+        body = app.current_event.json_body
+        logger.info('POST category request received', extra={'request_body': body})
+
+        required_fields = ['customer_id', 'name']
+        for field in required_fields:
+            if field not in body:
+                logger.warning('Missing required field', extra={'field': field})
+                return response_error(400, f'Missing required field: {field}')
+
+        now = int(datetime.utcnow().timestamp())
+        category = {
+            'customer_id': body['customer_id'],
+            'category_id': str(uuid.uuid4()),
+            'name': body['name'],
+            'created': now,
+            'updated': now,
+        }
+
+        category_table.put_item(Item=category)
+        logger.info('Category registered successfully', extra={'category_id': category['category_id']})
+        return response_result(result={'category_id': category['category_id']})
+
+    except json.JSONDecodeError as e:
+        logger.error('JSON decode error', extra={'error': str(e)})
+        return response_error(400, 'Invalid JSON')
+    except ClientError as e:
+        logger.error('DynamoDB error', extra={'error': str(e)})
+        return response_error(502, 'Database error')
+    except Exception as e:
+        logger.error('Internal server error', extra={'error': str(e)})
+        return response_error(500, 'Internal server error')
+
+
+@app.get('/api/v1/category/list')
+def get_categories() -> Response[str]:
+    try:
+        customer_id = app.current_event.get_query_string_value('customer_id')
+        logger.info('GET category list request received', extra={'customer_id': customer_id})
+
+        if not customer_id:
+            return response_error(400, 'Missing required parameter: customer_id')
+
+        response = category_table.query(
+            KeyConditionExpression='customer_id = :cid',
+            ExpressionAttributeValues={':cid': customer_id}
+        )
+
+        categories = response.get('Items', [])
+        logger.info('Categories retrieved successfully', extra={'count': len(categories)})
+        return response_result(result=categories)
+
+    except ClientError as e:
+        logger.error('DynamoDB error', extra={'error': str(e)})
+        return response_error(502, 'Database error')
+    except Exception as e:
+        logger.error('Internal server error', extra={'error': str(e)})
+        return response_error(500, 'Internal server error')
+
+
+@app.delete('/api/v1/category/delete')
+def delete_category() -> Response[str]:
+    try:
+        customer_id = app.current_event.get_query_string_value('customer_id')
+        category_id = app.current_event.get_query_string_value('category_id')
+        logger.info('DELETE category request received', extra={'customer_id': customer_id, 'category_id': category_id})
+
+        if not customer_id:
+            return response_error(400, 'Missing required parameter: customer_id')
+        if not category_id:
+            return response_error(400, 'Missing required parameter: category_id')
+
+        category_table.delete_item(
+            Key={
+                'customer_id': customer_id,
+                'category_id': category_id
+            }
+        )
+        logger.info('Category deleted successfully', extra={'category_id': category_id})
+        return response_result(result={'deleted': True})
+
+    except ClientError as e:
+        logger.error('DynamoDB error', extra={'error': str(e)})
+        return response_error(502, 'Database error')
+    except Exception as e:
+        logger.error('Internal server error', extra={'error': str(e)})
+        return response_error(500, 'Internal server error')
+
+
+@app.put('/api/v1/category/update')
+def update_category() -> Response[str]:
+    try:
+        body = app.current_event.json_body
+        logger.info('PUT category request received', extra={'request_body': body})
+
+        required_fields = ['customer_id', 'category_id', 'name']
+        for field in required_fields:
+            if field not in body:
+                logger.warning('Missing required field', extra={'field': field})
+                return response_error(400, f'Missing required field: {field}')
+
+        now = int(datetime.utcnow().timestamp())
+
+        category_table.update_item(
+            Key={
+                'customer_id': body['customer_id'],
+                'category_id': body['category_id']
+            },
+            UpdateExpression='SET #name = :name, updated = :updated',
+            ExpressionAttributeNames={'#name': 'name'},
+            ExpressionAttributeValues={
+                ':name': body['name'],
+                ':updated': now
+            }
+        )
+        logger.info('Category updated successfully', extra={'category_id': body['category_id']})
+        return response_result(result={'updated': True})
+
+    except json.JSONDecodeError as e:
+        logger.error('JSON decode error', extra={'error': str(e)})
+        return response_error(400, 'Invalid JSON')
     except ClientError as e:
         logger.error('DynamoDB error', extra={'error': str(e)})
         return response_error(502, 'Database error')
