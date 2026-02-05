@@ -11,11 +11,18 @@ Parameters:
   CallbackUrl:
     Type: String
     Default: http://localhost:3000/auth/callback
-    Description: OAuth callback URL
   LogoutUrl:
     Type: String
     Default: http://localhost:3000/login
-    Description: Logout redirect URL
+  GitHubPagesCallbackUrl:
+    Type: String
+    Default: 'https://a-nkt.github.io/kakeibo/auth/callback'
+  GitHubPagesLogoutUrl:
+    Type: String
+    Default: 'https://a-nkt.github.io/kakeibo/login'
+
+Conditions:
+  HasGitHubPages: !Not [!Equals [!Ref GitHubPagesCallbackUrl, '']]
 
 Resources:
   UserPool:
@@ -82,8 +89,10 @@ Resources:
       AllowedOAuthFlowsUserPoolClient: true
       CallbackURLs:
         - !Ref CallbackUrl
+        - !If [HasGitHubPages, !Ref GitHubPagesCallbackUrl, !Ref 'AWS::NoValue']
       LogoutURLs:
         - !Ref LogoutUrl
+        - !If [HasGitHubPages, !Ref GitHubPagesLogoutUrl, !Ref 'AWS::NoValue']
       PreventUserExistenceErrors: ENABLED
 
 Outputs:

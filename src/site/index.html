@@ -5,6 +5,19 @@
     <link rel="icon" href="/favicon.ico">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vite App</title>
+    <script>
+      // GitHub Pages SPA redirect handler
+      (function() {
+        const params = new URLSearchParams(window.location.search);
+        const path = params.get('p');
+        if (path) {
+          const query = params.get('q') || '';
+          const hash = params.get('h') || '';
+          const newUrl = path + query + hash;
+          window.history.replaceState(null, '', newUrl);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="app"></div>
