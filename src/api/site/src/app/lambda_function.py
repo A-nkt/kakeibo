@@ -68,7 +68,7 @@ def post_item() -> Response[str]:
         logger.info('POST request received', extra={'request_body': body})
 
         # バリデーション
-        required_fields = ['customer_id', 'name', 'price']
+        required_fields = ['customer_id', 'item_id', 'price']
         for field in required_fields:
             if field not in body:
                 logger.warning('Missing required field', extra={'field': field})
@@ -78,8 +78,8 @@ def post_item() -> Response[str]:
         now = int(datetime.utcnow().timestamp())
         item = {
             'customer_id': body['customer_id'],
-            'item_id': str(uuid.uuid4()),
-            'name': body['name'],
+            'id': str(uuid.uuid4()),
+            'item_id': body['item_id'],
             'price': body['price'],
             'created': now,
             'updated': now,
@@ -92,6 +92,32 @@ def post_item() -> Response[str]:
     except json.JSONDecodeError as e:
         logger.error('JSON decode error', extra={'error': str(e)})
         return response_error(400, 'Invalid JSON')
+    except ClientError as e:
+        logger.error('DynamoDB error', extra={'error': str(e)})
+        return response_error(502, 'Database error')
+    except Exception as e:
+        logger.error('Internal server error', extra={'error': str(e)})
+        return response_error(500, 'Internal server error')
+
+
+@app.get('/api/v1/item/list')
+def get_items() -> Response[str]:
+    try:
+        customer_id = app.current_event.get_query_string_value('customer_id')
+        logger.info('GET list request received', extra={'customer_id': customer_id})
+
+        if not customer_id:
+            return response_error(400, 'Missing required parameter: customer_id')
+
+        response = table.query(
+            KeyConditionExpression='customer_id = :cid',
+            ExpressionAttributeValues={':cid': customer_id}
+        )
+
+        items = response.get('Items', [])
+        logger.info('Items retrieved successfully', extra={'count': len(items)})
+        return response_result(result=items)
+
     except ClientError as e:
         logger.error('DynamoDB error', extra={'error': str(e)})
         return response_error(502, 'Database error')

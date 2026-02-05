@@ -72,6 +72,12 @@ Resources:
             RestApiId: !Ref Api
             Path: /api/v1/item/regist
             Method: POST
+        ItemList:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /api/v1/item/list
+            Method: GET
 
   FunctionLogGroup:
     Type: AWS::Logs::LogGroup
@@ -88,7 +94,7 @@ Resources:
       StageName: v1
       Cors:
         AllowOrigin: "'*'"
-        AllowMethods: "'POST, OPTIONS'"
+        AllowMethods: "'GET, POST, OPTIONS'"
         AllowHeaders: "'Content-Type'"
 
 Outputs:

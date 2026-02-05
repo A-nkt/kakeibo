@@ -1,45 +1,160 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useAuth } from '@/composables/useAuth'
+import { useItemsStore } from '@/stores/items'
 import DataTable from '@/components/dashboard/DataTable.vue'
 import BarChart from '@/components/dashboard/BarChart.vue'
 import StatCard from '@/components/dashboard/StatCard.vue'
-import {
-  tableColumns,
-  tableRows,
-  dailyLabels,
-  dailyDatasets,
-  weeklyLabels,
-  weeklyDatasets,
-  monthlyLabels,
-  monthlyDatasets,
-  stats
-} from '@/data/sampleData'
 
 const { currentUser, logout } = useAuth()
+const itemsStore = useItemsStore()
 
 const isLoaded = ref(false)
 const chartPeriod = ref<'daily' | 'weekly' | 'monthly'>('daily')
 const isUserMenuOpen = ref(false)
 
-// スライドオーバー関連
 const isSlideOverOpen = ref(false)
 const isSubmitting = ref(false)
 const showSuccess = ref(false)
 const selectedProduct = ref('')
 const price = ref<number | null>(null)
 
-// ダミー商品データ
 const products = [
-  { id: 'prod-001', name: 'クラウドストレージ Basic' },
-  { id: 'prod-002', name: 'クラウドストレージ Pro' },
-  { id: 'prod-003', name: 'データ分析ツール' },
-  { id: 'prod-004', name: 'セキュリティパッケージ' },
-  { id: 'prod-005', name: 'API連携サービス' },
-  { id: 'prod-006', name: 'バックアップソリューション' },
+  { id: '0001', name: '食費' },
+  { id: '0002', name: '外食費' },
+  { id: '0003', name: '交通費' },
+  { id: '0004', name: 'Suica' },
+  { id: '0005', name: '日用品' },
+  { id: '0006', name: '書籍費' },
+  { id: '0007', name: '航空券代' },
+  { id: '0008', name: 'ヘアカット' },
+  { id: '0009', name: '自習室代' },
+  { id: '0010', name: 'Amazon' },
+  { id: '0011', name: '娯楽費' },
+  { id: '0012', name: '旅費関連' },
 ]
 
-const userEmail = computed(() => currentUser.value?.email || localStorage.getItem('userEmail') || 'user@example.com')
+// テーブル用のカラム定義
+const tableColumns = [
+  { key: 'item_name', label: 'カテゴリ', width: '150px' },
+  { key: 'price', label: '金額', width: '120px' },
+  { key: 'created_date', label: '登録日', width: '120px' },
+]
+
+// itemsをテーブル表示用に変換
+const tableRows = computed(() => {
+  return itemsStore.items.map(item => {
+    const product = products.find(p => p.id === item.item_id)
+    return {
+      item_name: product?.name || item.item_id,
+      price: item.price,
+      created_date: new Date(item.created * 1000).toLocaleDateString('ja-JP'),
+    }
+  })
+})
+
+// 統計カード用のデータ
+const stats = computed(() => {
+  const items = itemsStore.items
+  const totalAmount = items.reduce((sum, item) => sum + item.price, 0)
+  const itemCount = items.length
+
+  // 今月のデータ
+  const now = new Date()
+  const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime() / 1000
+  const thisMonthItems = items.filter(item => item.created >= thisMonthStart)
+  const thisMonthTotal = thisMonthItems.reduce((sum, item) => sum + item.price, 0)
+
+  // 先月のデータ（比較用）
+  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime() / 1000
+  const lastMonthEnd = thisMonthStart
+  const lastMonthItems = items.filter(item => item.created >= lastMonthStart && item.created < lastMonthEnd)
+  const lastMonthTotal = lastMonthItems.reduce((sum, item) => sum + item.price, 0)
+
+  // 前月比
+  const monthlyChange = lastMonthTotal > 0 
+    ? Math.round((thisMonthTotal - lastMonthTotal) / lastMonthTotal * 100) 
+    : 0
+
+  return [
+    {
+      title: '総支出',
+      value: `¥${totalAmount.toLocaleString()}`,
+      icon: '💰',
+      trend: 0,
+      color: 'blue' as const
+    },
+    {
+      title: '今月の支出',
+      value: `¥${thisMonthTotal.toLocaleString()}`,
+      icon: '📅',
+      trend: monthlyChange,
+      color: 'green' as const
+    },
+    {
+      title: '登録件数',
+      value: itemCount.toString(),
+      icon: '📝',
+      trend: 0,
+      color: 'purple' as const
+    },
+  ]
+})
+
+// グラフ用のデータ
+const getDateKey = (timestamp: number, period: 'daily' | 'weekly' | 'monthly') => {
+  const date = new Date(timestamp * 1000)
+  if (period === 'monthly') {
+    return `${date.getFullYear()}/${date.getMonth() + 1}`
+  } else if (period === 'weekly') {
+    const weekStart = new Date(date)
+    weekStart.setDate(date.getDate() - date.getDay())
+    return `${weekStart.getMonth() + 1}/${weekStart.getDate()}週`
+  } else {
+    return `${date.getMonth() + 1}/${date.getDate()}`
+  }
+}
+
+const chartData = computed(() => {
+  const items = itemsStore.items
+  const period = chartPeriod.value
+  
+  // 期間ごとに集計
+  const grouped: Record<string, number> = {}
+  items.forEach(item => {
+    const key = getDateKey(item.created, period)
+    grouped[key] = (grouped[key] || 0) + item.price
+  })
+  
+  // ソートしてラベルとデータを取得
+  const sortedKeys = Object.keys(grouped).sort((a, b) => {
+    // 日付順にソート
+    return a.localeCompare(b)
+  }).slice(-10) // 直近10件
+  
+  return {
+    labels: sortedKeys,
+    datasets: [{
+      label: '支出',
+      data: sortedKeys.map(key => grouped[key] || 0),
+      backgroundColor: 'rgba(99, 102, 241, 0.8)',
+      borderColor: 'rgb(99, 102, 241)',
+      borderWidth: 1
+    }]
+  }
+})
+
+const currentLabels = computed(() => chartData.value.labels)
+const currentDatasets = computed(() => chartData.value.datasets)
+
+const statsGridClass = computed(() => {
+  if (stats.value.length === 3) {
+    return 'grid-cols-1 sm:grid-cols-3'
+  }
+  return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'
+})
+
+const userEmail = computed(() => currentUser.value?.email || localStorage.getItem('userEmail') || '')
 
 const isFormValid = computed(() => {
   return selectedProduct.value !== '' && price.value !== null && price.value > 0
@@ -50,33 +165,15 @@ const formattedPrice = computed(() => {
   return new Intl.NumberFormat('ja-JP').format(price.value)
 })
 
-onMounted(() => {
+onMounted(async () => {
   setTimeout(() => {
     isLoaded.value = true
   }, 100)
-})
 
-const currentLabels = computed(() => {
-  switch (chartPeriod.value) {
-    case 'weekly': return weeklyLabels
-    case 'monthly': return monthlyLabels
-    default: return dailyLabels
+  const customerId = currentUser.value?.email || localStorage.getItem('userEmail') || ''
+  if (customerId) {
+    await itemsStore.fetchItems(customerId)
   }
-})
-
-const currentDatasets = computed(() => {
-  switch (chartPeriod.value) {
-    case 'weekly': return weeklyDatasets
-    case 'monthly': return monthlyDatasets
-    default: return dailyDatasets
-  }
-})
-
-const statsGridClass = computed(() => {
-  if (stats.length === 3) {
-    return 'grid-cols-1 sm:grid-cols-3'
-  }
-  return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'
 })
 
 const openSlideOver = () => {
@@ -90,19 +187,29 @@ const closeSlideOver = () => {
 
 const handleSubmit = async () => {
   if (!isFormValid.value) return
-  
+
   isSubmitting.value = true
-  await new Promise(resolve => setTimeout(resolve, 1000))
-  
-  isSubmitting.value = false
-  showSuccess.value = true
-  
-  setTimeout(() => {
-    showSuccess.value = false
-    selectedProduct.value = ''
-    price.value = null
-    closeSlideOver()
-  }, 1500)
+
+  try {
+    const selectedProductData = products.find(p => p.id === selectedProduct.value)
+    const customerId = currentUser.value?.email || 'anonymous'
+
+    await itemsStore.addItem(customerId, selectedProductData?.id || '', price.value)
+
+    showSuccess.value = true
+
+    setTimeout(() => {
+      showSuccess.value = false
+      selectedProduct.value = ''
+      price.value = null
+      closeSlideOver()
+    }, 1500)
+  } catch (error) {
+    console.error('Registration error:', error)
+    alert(error instanceof Error ? error.message : '登録に失敗しました')
+  } finally {
+    isSubmitting.value = false
+  }
 }
 </script>
 
@@ -237,15 +344,10 @@ const handleSubmit = async () => {
           :style="{ animationDelay: '500ms' }"
         >
           <div class="mb-4 flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-gray-800">商品一覧</h2>
-            <button class="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-200">
-              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-              エクスポート
-            </button>
+            <h2 class="text-lg font-semibold text-gray-800">支出一覧</h2>
+            <span v-if="itemsStore.isLoading" class="text-xs text-gray-500">読み込み中...</span>
           </div>
-          <DataTable :columns="tableColumns" :rows="tableRows" />
+          <DataTable :columns="tableColumns" :rows="tableRows" empty-message="登録された支出はありません" />
         </div>
       </div>
     </main>
