@@ -28,6 +28,7 @@ app = APIGatewayRestResolver(
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(os.environ['TABLE_NAME'])
 category_table = dynamodb.Table(os.environ['CATEGORY_TABLE_NAME'])
+customer_table = dynamodb.Table(os.environ['CUSTOMER_TABLE_NAME'])
 
 
 def decimal_default_proc(obj: Any):
@@ -253,6 +254,70 @@ def update_category() -> Response[str]:
     except json.JSONDecodeError as e:
         logger.error('JSON decode error', extra={'error': str(e)})
         return response_error(400, 'Invalid JSON')
+    except ClientError as e:
+        logger.error('DynamoDB error', extra={'error': str(e)})
+        return response_error(502, 'Database error')
+    except Exception as e:
+        logger.error('Internal server error', extra={'error': str(e)})
+        return response_error(500, 'Internal server error')
+
+
+# --------------------------------------------------------------------------------------------------
+# Customer Budget API
+# --------------------------------------------------------------------------------------------------
+@app.post('/api/v1/customer/budget/regist')
+def post_budget() -> Response[str]:
+    try:
+        body = app.current_event.json_body
+        logger.info('POST budget request received', extra={'request_body': body})
+
+        required_fields = ['customer_id', 'budget']
+        for field in required_fields:
+            if field not in body:
+                logger.warning('Missing required field', extra={'field': field})
+                return response_error(400, f'Missing required field: {field}')
+
+        now = int(datetime.utcnow().timestamp())
+
+        customer_table.update_item(
+            Key={'customer_id': body['customer_id']},
+            UpdateExpression='SET budget = :budget, updated = :updated',
+            ExpressionAttributeValues={
+                ':budget': body['budget'],
+                ':updated': now
+            }
+        )
+        logger.info('Budget registered successfully', extra={'customer_id': body['customer_id']})
+        return response_result(result={'registered': True})
+
+    except json.JSONDecodeError as e:
+        logger.error('JSON decode error', extra={'error': str(e)})
+        return response_error(400, 'Invalid JSON')
+    except ClientError as e:
+        logger.error('DynamoDB error', extra={'error': str(e)})
+        return response_error(502, 'Database error')
+    except Exception as e:
+        logger.error('Internal server error', extra={'error': str(e)})
+        return response_error(500, 'Internal server error')
+
+
+@app.get('/api/v1/customer/budget')
+def get_budget() -> Response[str]:
+    try:
+        customer_id = app.current_event.get_query_string_value('customer_id')
+        logger.info('GET budget request received', extra={'customer_id': customer_id})
+
+        if not customer_id:
+            return response_error(400, 'Missing required parameter: customer_id')
+
+        response = customer_table.get_item(Key={'customer_id': customer_id})
+        item = response.get('Item')
+
+        if item:
+            return response_result(result={'budget': item.get('budget', 0)})
+        else:
+            return response_result(result={'budget': 0})
+
     except ClientError as e:
         logger.error('DynamoDB error', extra={'error': str(e)})
         return response_error(502, 'Database error')
