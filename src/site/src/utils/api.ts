@@ -104,3 +104,35 @@ export async function updateCategory(customerId: string, categoryId: string, nam
 
   return response.json()
 }
+
+// Budget API
+export async function getBudget(customerId: string) {
+  const response = await fetch(`${API_BASE_URL}/api/v1/customer/budget?customer_id=${encodeURIComponent(customerId)}`)
+
+  if (!response.ok) {
+    const errorData = await response.json()
+    throw new Error(errorData.message || '予算の取得に失敗しました')
+  }
+
+  return response.json()
+}
+
+export async function registBudget(customerId: string, budget: number) {
+  const response = await fetch(`${API_BASE_URL}/api/v1/customer/budget/regist`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      budget,
+    }),
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json()
+    throw new Error(errorData.message || '予算の登録に失敗しました')
+  }
+
+  return response.json()
+}
