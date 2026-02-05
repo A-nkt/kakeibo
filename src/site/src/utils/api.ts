@@ -14,7 +14,7 @@ export async function registItem({ customerId, itemId, price }: RegistItemParams
     },
     body: JSON.stringify({
       customer_id: customerId,
-      item_id: itemId,
+      id: itemId,
       price,
     }),
   })

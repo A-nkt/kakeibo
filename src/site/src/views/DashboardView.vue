@@ -44,9 +44,9 @@ const tableColumns = [
 // itemsをテーブル表示用に変換
 const tableRows = computed(() => {
   return itemsStore.items.map(item => {
-    const product = products.find(p => p.id === item.item_id)
+    const product = products.find(p => p.id === item.id)
     return {
-      item_name: product?.name || item.item_id,
+      item_name: product?.name || item.id,
       price: item.price,
       created_date: new Date(item.created * 1000).toLocaleDateString('ja-JP'),
     }

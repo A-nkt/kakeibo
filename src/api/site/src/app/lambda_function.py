@@ -68,7 +68,7 @@ def post_item() -> Response[str]:
         logger.info('POST request received', extra={'request_body': body})
 
         # バリデーション
-        required_fields = ['customer_id', 'item_id', 'price']
+        required_fields = ['customer_id', 'id', 'price']
         for field in required_fields:
             if field not in body:
                 logger.warning('Missing required field', extra={'field': field})
@@ -78,8 +78,8 @@ def post_item() -> Response[str]:
         now = int(datetime.utcnow().timestamp())
         item = {
             'customer_id': body['customer_id'],
-            'id': str(uuid.uuid4()),
-            'item_id': body['item_id'],
+            'item_id': str(uuid.uuid4()),
+            'id': body['id'],
             'price': body['price'],
             'created': now,
             'updated': now,
