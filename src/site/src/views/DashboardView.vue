@@ -1,13 +1,17 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useItemsStore } from '@/stores/items'
+import { useCategoriesStore } from '@/stores/categories'
 import DataTable from '@/components/dashboard/DataTable.vue'
 import BarChart from '@/components/dashboard/BarChart.vue'
 import StatCard from '@/components/dashboard/StatCard.vue'
 
+const router = useRouter()
 const { currentUser, logout } = useAuth()
 const itemsStore = useItemsStore()
+const categoriesStore = useCategoriesStore()
 
 const isLoaded = ref(false)
 const chartPeriod = ref<'daily' | 'weekly' | 'monthly'>('daily')
@@ -19,20 +23,7 @@ const showSuccess = ref(false)
 const selectedProduct = ref('')
 const price = ref<number | null>(null)
 
-const products = [
-  { id: '0001', name: '食費' },
-  { id: '0002', name: '外食費' },
-  { id: '0003', name: '交通費' },
-  { id: '0004', name: 'Suica' },
-  { id: '0005', name: '日用品' },
-  { id: '0006', name: '書籍費' },
-  { id: '0007', name: '航空券代' },
-  { id: '0008', name: 'ヘアカット' },
-  { id: '0009', name: '自習室代' },
-  { id: '0010', name: 'Amazon' },
-  { id: '0011', name: '娯楽費' },
-  { id: '0012', name: '旅費関連' },
-]
+const products = computed(() => categoriesStore.categories)
 
 // テーブル用のカラム定義
 const tableColumns = [
@@ -44,7 +35,7 @@ const tableColumns = [
 // itemsをテーブル表示用に変換
 const tableRows = computed(() => {
   return itemsStore.items.map(item => {
-    const product = products.find(p => p.id === item.id)
+    const product = products.value.find(p => p.category_id === item.id)
     return {
       item_name: product?.name || item.id,
       price: item.price,
@@ -172,7 +163,10 @@ onMounted(async () => {
 
   const customerId = currentUser.value?.email || localStorage.getItem('userEmail') || ''
   if (customerId) {
-    await itemsStore.fetchItems(customerId)
+    await Promise.all([
+      itemsStore.fetchItems(customerId),
+      categoriesStore.fetchCategories(customerId)
+    ])
   }
 })
 
@@ -191,10 +185,10 @@ const handleSubmit = async () => {
   isSubmitting.value = true
 
   try {
-    const selectedProductData = products.find(p => p.id === selectedProduct.value)
+    const selectedProductData = products.value.find(p => p.category_id === selectedProduct.value)
     const customerId = currentUser.value?.email || 'anonymous'
 
-    await itemsStore.addItem(customerId, selectedProductData?.id || '', price.value)
+    await itemsStore.addItem(customerId, selectedProductData?.category_id || '', price.value)
 
     showSuccess.value = true
 
@@ -221,7 +215,7 @@ const handleSubmit = async () => {
         <div class="flex items-center justify-between">
           <div>
             <h1 class="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-3xl font-bold tracking-tight text-transparent">
-              Dashboard
+              AI 家計簿
             </h1>
             <p class="mt-1 text-sm text-gray-500">費用データの概要とトレンド分析</p>
           </div>
@@ -251,6 +245,15 @@ const handleSubmit = async () => {
                 <p class="text-xs text-gray-500">ログイン中</p>
                 <p class="truncate text-sm font-medium text-gray-900">{{ userEmail }}</p>
               </div>
+              <button
+                @click="router.push('/categories')"
+                class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100"
+              >
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+                カテゴリ管理
+              </button>
               <button
                 @click="logout"
                 class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100"
@@ -434,7 +437,7 @@ const handleSubmit = async () => {
                     class="w-full appearance-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 pr-10 text-gray-900 transition-all focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                   >
                     <option value="" disabled>商品を選択</option>
-                    <option v-for="product in products" :key="product.id" :value="product.id">
+                    <option v-for="product in products" :key="product.category_id" :value="product.category_id">
                       {{ product.name }}
                     </option>
                   </select>
