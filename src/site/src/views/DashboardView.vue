@@ -1,56 +1,216 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useAuth } from '@/composables/useAuth'
+import { useItemsStore } from '@/stores/items'
 import DataTable from '@/components/dashboard/DataTable.vue'
 import BarChart from '@/components/dashboard/BarChart.vue'
 import StatCard from '@/components/dashboard/StatCard.vue'
-import {
-  tableColumns,
-  tableRows,
-  dailyLabels,
-  dailyDatasets,
-  weeklyLabels,
-  weeklyDatasets,
-  monthlyLabels,
-  monthlyDatasets,
-  stats
-} from '@/data/sampleData'
 
 const { currentUser, logout } = useAuth()
+const itemsStore = useItemsStore()
+
 const isLoaded = ref(false)
 const chartPeriod = ref<'daily' | 'weekly' | 'monthly'>('daily')
 const isUserMenuOpen = ref(false)
 
-const userEmail = computed(() => currentUser.value?.email || localStorage.getItem('userEmail') || 'user@example.com')
+const isSlideOverOpen = ref(false)
+const isSubmitting = ref(false)
+const showSuccess = ref(false)
+const selectedProduct = ref('')
+const price = ref<number | null>(null)
 
-onMounted(() => {
-  setTimeout(() => {
-    isLoaded.value = true
-  }, 100)
+const products = [
+  { id: '0001', name: '食費' },
+  { id: '0002', name: '外食費' },
+  { id: '0003', name: '交通費' },
+  { id: '0004', name: 'Suica' },
+  { id: '0005', name: '日用品' },
+  { id: '0006', name: '書籍費' },
+  { id: '0007', name: '航空券代' },
+  { id: '0008', name: 'ヘアカット' },
+  { id: '0009', name: '自習室代' },
+  { id: '0010', name: 'Amazon' },
+  { id: '0011', name: '娯楽費' },
+  { id: '0012', name: '旅費関連' },
+]
+
+// テーブル用のカラム定義
+const tableColumns = [
+  { key: 'item_name', label: 'カテゴリ', width: '150px' },
+  { key: 'price', label: '金額', width: '120px' },
+  { key: 'created_date', label: '登録日', width: '120px' },
+]
+
+// itemsをテーブル表示用に変換
+const tableRows = computed(() => {
+  return itemsStore.items.map(item => {
+    const product = products.find(p => p.id === item.item_id)
+    return {
+      item_name: product?.name || item.item_id,
+      price: item.price,
+      created_date: new Date(item.created * 1000).toLocaleDateString('ja-JP'),
+    }
+  })
 })
 
-const currentLabels = computed(() => {
-  switch (chartPeriod.value) {
-    case 'weekly': return weeklyLabels
-    case 'monthly': return monthlyLabels
-    default: return dailyLabels
+// 統計カード用のデータ
+const stats = computed(() => {
+  const items = itemsStore.items
+  const totalAmount = items.reduce((sum, item) => sum + item.price, 0)
+  const itemCount = items.length
+
+  // 今月のデータ
+  const now = new Date()
+  const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime() / 1000
+  const thisMonthItems = items.filter(item => item.created >= thisMonthStart)
+  const thisMonthTotal = thisMonthItems.reduce((sum, item) => sum + item.price, 0)
+
+  // 先月のデータ（比較用）
+  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime() / 1000
+  const lastMonthEnd = thisMonthStart
+  const lastMonthItems = items.filter(item => item.created >= lastMonthStart && item.created < lastMonthEnd)
+  const lastMonthTotal = lastMonthItems.reduce((sum, item) => sum + item.price, 0)
+
+  // 前月比
+  const monthlyChange = lastMonthTotal > 0 
+    ? Math.round((thisMonthTotal - lastMonthTotal) / lastMonthTotal * 100) 
+    : 0
+
+  return [
+    {
+      title: '総支出',
+      value: `¥${totalAmount.toLocaleString()}`,
+      icon: '💰',
+      trend: 0,
+      color: 'blue' as const
+    },
+    {
+      title: '今月の支出',
+      value: `¥${thisMonthTotal.toLocaleString()}`,
+      icon: '📅',
+      trend: monthlyChange,
+      color: 'green' as const
+    },
+    {
+      title: '登録件数',
+      value: itemCount.toString(),
+      icon: '📝',
+      trend: 0,
+      color: 'purple' as const
+    },
+  ]
+})
+
+// グラフ用のデータ
+const getDateKey = (timestamp: number, period: 'daily' | 'weekly' | 'monthly') => {
+  const date = new Date(timestamp * 1000)
+  if (period === 'monthly') {
+    return `${date.getFullYear()}/${date.getMonth() + 1}`
+  } else if (period === 'weekly') {
+    const weekStart = new Date(date)
+    weekStart.setDate(date.getDate() - date.getDay())
+    return `${weekStart.getMonth() + 1}/${weekStart.getDate()}週`
+  } else {
+    return `${date.getMonth() + 1}/${date.getDate()}`
+  }
+}
+
+const chartData = computed(() => {
+  const items = itemsStore.items
+  const period = chartPeriod.value
+  
+  // 期間ごとに集計
+  const grouped: Record<string, number> = {}
+  items.forEach(item => {
+    const key = getDateKey(item.created, period)
+    grouped[key] = (grouped[key] || 0) + item.price
+  })
+  
+  // ソートしてラベルとデータを取得
+  const sortedKeys = Object.keys(grouped).sort((a, b) => {
+    // 日付順にソート
+    return a.localeCompare(b)
+  }).slice(-10) // 直近10件
+  
+  return {
+    labels: sortedKeys,
+    datasets: [{
+      label: '支出',
+      data: sortedKeys.map(key => grouped[key] || 0),
+      backgroundColor: 'rgba(99, 102, 241, 0.8)',
+      borderColor: 'rgb(99, 102, 241)',
+      borderWidth: 1
+    }]
   }
 })
 
-const currentDatasets = computed(() => {
-  switch (chartPeriod.value) {
-    case 'weekly': return weeklyDatasets
-    case 'monthly': return monthlyDatasets
-    default: return dailyDatasets
-  }
-})
+const currentLabels = computed(() => chartData.value.labels)
+const currentDatasets = computed(() => chartData.value.datasets)
 
 const statsGridClass = computed(() => {
-  if (stats.length === 3) {
+  if (stats.value.length === 3) {
     return 'grid-cols-1 sm:grid-cols-3'
   }
   return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'
 })
+
+const userEmail = computed(() => currentUser.value?.email || localStorage.getItem('userEmail') || '')
+
+const isFormValid = computed(() => {
+  return selectedProduct.value !== '' && price.value !== null && price.value > 0
+})
+
+const formattedPrice = computed(() => {
+  if (price.value === null) return ''
+  return new Intl.NumberFormat('ja-JP').format(price.value)
+})
+
+onMounted(async () => {
+  setTimeout(() => {
+    isLoaded.value = true
+  }, 100)
+
+  const customerId = currentUser.value?.email || localStorage.getItem('userEmail') || ''
+  if (customerId) {
+    await itemsStore.fetchItems(customerId)
+  }
+})
+
+const openSlideOver = () => {
+  isSlideOverOpen.value = true
+}
+
+const closeSlideOver = () => {
+  isSlideOverOpen.value = false
+  showSuccess.value = false
+}
+
+const handleSubmit = async () => {
+  if (!isFormValid.value) return
+
+  isSubmitting.value = true
+
+  try {
+    const selectedProductData = products.find(p => p.id === selectedProduct.value)
+    const customerId = currentUser.value?.email || 'anonymous'
+
+    await itemsStore.addItem(customerId, selectedProductData?.id || '', price.value)
+
+    showSuccess.value = true
+
+    setTimeout(() => {
+      showSuccess.value = false
+      selectedProduct.value = ''
+      price.value = null
+      closeSlideOver()
+    }, 1500)
+  } catch (error) {
+    console.error('Registration error:', error)
+    alert(error instanceof Error ? error.message : '登録に失敗しました')
+  } finally {
+    isSubmitting.value = false
+  }
+}
 </script>
 
 <template>
@@ -184,18 +344,162 @@ const statsGridClass = computed(() => {
           :style="{ animationDelay: '500ms' }"
         >
           <div class="mb-4 flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-gray-800">商品一覧</h2>
-            <button class="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-200">
-              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-              エクスポート
-            </button>
+            <h2 class="text-lg font-semibold text-gray-800">支出一覧</h2>
+            <span v-if="itemsStore.isLoading" class="text-xs text-gray-500">読み込み中...</span>
           </div>
-          <DataTable :columns="tableColumns" :rows="tableRows" />
+          <DataTable :columns="tableColumns" :rows="tableRows" empty-message="登録された支出はありません" />
         </div>
       </div>
     </main>
+
+    <!-- FAB (Floating Action Button) -->
+    <button
+      @click="openSlideOver"
+      class="fab-button fixed bottom-8 right-8 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg transition-all hover:scale-110 hover:shadow-xl active:scale-95"
+    >
+      <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+      </svg>
+    </button>
+
+    <!-- FAB Tooltip -->
+    <div class="fab-tooltip fixed bottom-10 right-24 z-40 rounded-lg bg-gray-900 px-3 py-1.5 text-sm text-white opacity-0 shadow-lg transition-opacity">
+      項目登録
+    </div>
+
+    <!-- Slide Over Backdrop -->
+    <Transition name="fade">
+      <div
+        v-if="isSlideOverOpen"
+        class="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm"
+        @click="closeSlideOver"
+      />
+    </Transition>
+
+    <!-- Slide Over Panel -->
+    <Transition name="slide">
+      <div
+        v-if="isSlideOverOpen"
+        class="fixed inset-y-0 right-0 z-50 w-full max-w-md"
+      >
+        <div class="flex h-full flex-col bg-white shadow-2xl">
+          <!-- Header -->
+          <div class="border-b border-gray-100 bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-5">
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-xl font-semibold text-white">項目登録</h2>
+                <p class="mt-1 text-sm text-indigo-100">新しい項目を追加します</p>
+              </div>
+              <button
+                @click="closeSlideOver"
+                class="rounded-lg p-2 text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+              >
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Form Content -->
+          <div class="flex-1 overflow-y-auto p-6">
+            <!-- Success Message -->
+            <Transition name="fade">
+              <div
+                v-if="showSuccess"
+                class="mb-6 flex items-center gap-3 rounded-xl bg-green-50 p-4 text-green-800"
+              >
+                <div class="flex h-10 w-10 items-center justify-center rounded-full bg-green-100">
+                  <svg class="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div>
+                  <p class="font-medium">登録完了</p>
+                  <p class="text-sm text-green-600">項目が追加されました</p>
+                </div>
+              </div>
+            </Transition>
+
+            <form @submit.prevent="handleSubmit" class="space-y-6">
+              <!-- Product Select -->
+              <div>
+                <label for="product" class="mb-2 block text-sm font-medium text-gray-700">
+                  商品
+                </label>
+                <div class="relative">
+                  <select
+                    id="product"
+                    v-model="selectedProduct"
+                    class="w-full appearance-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 pr-10 text-gray-900 transition-all focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  >
+                    <option value="" disabled>商品を選択</option>
+                    <option v-for="product in products" :key="product.id" :value="product.id">
+                      {{ product.name }}
+                    </option>
+                  </select>
+                  <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                    <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Price Input -->
+              <div>
+                <label for="price" class="mb-2 block text-sm font-medium text-gray-700">
+                  価格
+                </label>
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-500">¥</span>
+                  <input
+                    id="price"
+                    v-model.number="price"
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="0"
+                    class="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 pl-8 pr-4 text-gray-900 transition-all focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                </div>
+                <p v-if="price" class="mt-2 text-sm text-gray-500">
+                  {{ formattedPrice }} 円
+                </p>
+              </div>
+            </form>
+          </div>
+
+          <!-- Footer -->
+          <div class="border-t border-gray-100 bg-gray-50 px-6 py-4">
+            <div class="flex gap-3">
+              <button
+                type="button"
+                @click="closeSlideOver"
+                class="flex-1 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 transition-all hover:bg-gray-50"
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                @click="handleSubmit"
+                :disabled="!isFormValid || isSubmitting"
+                class="flex-1 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-3 text-sm font-medium text-white transition-all hover:from-indigo-700 hover:to-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <span v-if="!isSubmitting">登録する</span>
+                <span v-else class="flex items-center justify-center gap-2">
+                  <svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  登録中...
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -223,5 +527,37 @@ const statsGridClass = computed(() => {
 .animate-slide-up {
   opacity: 0;
   animation: slide-up 0.6s ease-out forwards;
+}
+
+/* FAB hover tooltip */
+.fab-button:hover + .fab-tooltip {
+  opacity: 1;
+}
+
+/* Slide Over Transitions */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.slide-enter-active {
+  transition: transform 0.3s ease-out;
+}
+
+.slide-leave-active {
+  transition: transform 0.2s ease-in;
+}
+
+.slide-enter-from {
+  transform: translateX(100%);
+}
+
+.slide-leave-to {
+  transform: translateX(100%);
 }
 </style>

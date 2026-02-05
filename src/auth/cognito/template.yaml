@@ -4,7 +4,6 @@ Description: Cognito User Pool with Google OAuth
 Parameters:
   Environment:
     Type: String
-    Default: dev
     AllowedValues:
       - dev
       - stg
