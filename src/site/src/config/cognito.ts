@@ -22,7 +22,7 @@ export const getGoogleLoginUrl = () => {
 
 export const getLogoutUrl = () => {
   const { domain, clientId } = cognitoConfig
-  const logoutRedirectUri = window.location.origin + '/login'
+  const logoutRedirectUri = import.meta.env.VITE_COGNITO_LOGOUT_URI || window.location.origin + import.meta.env.BASE_URL + 'login'
   const params = new URLSearchParams({
     client_id: clientId,
     logout_uri: logoutRedirectUri,
