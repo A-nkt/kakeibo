@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: DynamoDB Table for Items
+Description: DynamoDB Table for category
 
 Parameters:
   Environment:
@@ -7,23 +7,23 @@ Parameters:
     AllowedValues:
       - dev
       - stg
-      - prod
+      - prd
 
 Resources:
   ItemTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub '${Environment}-app-item-table'
+      TableName: !Sub '${Environment}-app-category-table'
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: customer_id
           AttributeType: S
-        - AttributeName: item_id
+        - AttributeName: category_id
           AttributeType: S
       KeySchema:
         - AttributeName: customer_id
           KeyType: HASH
-        - AttributeName: item_id
+        - AttributeName: category_id
           KeyType: RANGE
       Tags:
         - Key: Environment

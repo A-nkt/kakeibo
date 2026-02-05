@@ -3,27 +3,31 @@ interface Props {
   title: string
   value: string | number
   icon: string
+  subtitle?: string
   trend?: number
-  color?: 'blue' | 'green' | 'purple' | 'orange'
+  color?: 'blue' | 'green' | 'purple' | 'orange' | 'red'
 }
 
 const props = withDefaults(defineProps<Props>(), {
   color: 'blue',
-  trend: 0
+  trend: 0,
+  subtitle: ''
 })
 
 const colorClasses = {
   blue: 'from-blue-500 to-blue-600',
   green: 'from-emerald-500 to-emerald-600',
   purple: 'from-purple-500 to-purple-600',
-  orange: 'from-orange-500 to-orange-600'
+  orange: 'from-orange-500 to-orange-600',
+  red: 'from-red-500 to-red-600'
 }
 
 const iconBgClasses = {
   blue: 'bg-blue-400/30',
   green: 'bg-emerald-400/30',
   purple: 'bg-purple-400/30',
-  orange: 'bg-orange-400/30'
+  orange: 'bg-orange-400/30',
+  red: 'bg-red-400/30'
 }
 </script>
 
@@ -39,6 +43,7 @@ const iconBgClasses = {
       <div>
         <p class="text-sm font-medium text-white/80">{{ title }}</p>
         <p class="mt-2 text-3xl font-bold tracking-tight">{{ value }}</p>
+        <p v-if="subtitle" class="mt-1 text-sm text-white/70">{{ subtitle }}</p>
         <div v-if="trend !== 0" class="mt-2 flex items-center gap-1 text-sm">
           <span v-if="trend > 0" class="flex items-center text-emerald-300">
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

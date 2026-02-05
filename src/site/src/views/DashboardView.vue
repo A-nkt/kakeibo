@@ -1,13 +1,19 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useItemsStore } from '@/stores/items'
+import { useCategoriesStore } from '@/stores/categories'
+import { useBudgetStore } from '@/stores/budget'
 import DataTable from '@/components/dashboard/DataTable.vue'
 import BarChart from '@/components/dashboard/BarChart.vue'
 import StatCard from '@/components/dashboard/StatCard.vue'
 
+const router = useRouter()
 const { currentUser, logout } = useAuth()
 const itemsStore = useItemsStore()
+const categoriesStore = useCategoriesStore()
+const budgetStore = useBudgetStore()
 
 const isLoaded = ref(false)
 const chartPeriod = ref<'daily' | 'weekly' | 'monthly'>('daily')
@@ -19,20 +25,10 @@ const showSuccess = ref(false)
 const selectedProduct = ref('')
 const price = ref<number | null>(null)
 
-const products = [
-  { id: '0001', name: '食費' },
-  { id: '0002', name: '外食費' },
-  { id: '0003', name: '交通費' },
-  { id: '0004', name: 'Suica' },
-  { id: '0005', name: '日用品' },
-  { id: '0006', name: '書籍費' },
-  { id: '0007', name: '航空券代' },
-  { id: '0008', name: 'ヘアカット' },
-  { id: '0009', name: '自習室代' },
-  { id: '0010', name: 'Amazon' },
-  { id: '0011', name: '娯楽費' },
-  { id: '0012', name: '旅費関連' },
-]
+const isBudgetModalOpen = ref(false)
+const budgetInput = ref<number | null>(null)
+
+const products = computed(() => categoriesStore.categories)
 
 // テーブル用のカラム定義
 const tableColumns = [
@@ -44,7 +40,7 @@ const tableColumns = [
 // itemsをテーブル表示用に変換
 const tableRows = computed(() => {
   return itemsStore.items.map(item => {
-    const product = products.find(p => p.id === item.id)
+    const product = products.value.find(p => p.category_id === item.id)
     return {
       item_name: product?.name || item.id,
       price: item.price,
@@ -56,14 +52,21 @@ const tableRows = computed(() => {
 // 統計カード用のデータ
 const stats = computed(() => {
   const items = itemsStore.items
-  const totalAmount = items.reduce((sum, item) => sum + item.price, 0)
-  const itemCount = items.length
 
   // 今月のデータ
   const now = new Date()
   const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime() / 1000
   const thisMonthItems = items.filter(item => item.created >= thisMonthStart)
   const thisMonthTotal = thisMonthItems.reduce((sum, item) => sum + item.price, 0)
+
+  // 今月の残り日数
+  const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+  const remainingDays = lastDayOfMonth - now.getDate() + 1 // 今日を含む
+
+  // 予算と残り
+  const budget = budgetStore.budget || 0
+  const remaining = budget - thisMonthTotal
+  const dailyBudget = remainingDays > 0 ? Math.floor(remaining / remainingDays) : 0
 
   // 先月のデータ（比較用）
   const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime() / 1000
@@ -78,25 +81,28 @@ const stats = computed(() => {
 
   return [
     {
-      title: '総支出',
-      value: `¥${totalAmount.toLocaleString()}`,
+      title: '今月の残り',
+      value: `¥${dailyBudget.toLocaleString()}/日`,
+      subtitle: `残り${remainingDays}日`,
       icon: '💰',
       trend: 0,
-      color: 'blue' as const
+      color: dailyBudget >= 0 ? 'blue' as const : 'red' as const
     },
     {
       title: '今月の支出',
       value: `¥${thisMonthTotal.toLocaleString()}`,
+      subtitle: budget > 0 ? `予算 ¥${budget.toLocaleString()}` : '',
       icon: '📅',
       trend: monthlyChange,
       color: 'green' as const
     },
     {
-      title: '登録件数',
-      value: itemCount.toString(),
-      icon: '📝',
+      title: '残り予算',
+      value: `¥${remaining.toLocaleString()}`,
+      subtitle: remaining >= 0 ? '余裕あり' : '超過',
+      icon: '📊',
       trend: 0,
-      color: 'purple' as const
+      color: remaining >= 0 ? 'purple' as const : 'red' as const
     },
   ]
 })
@@ -172,12 +178,41 @@ onMounted(async () => {
 
   const customerId = currentUser.value?.email || localStorage.getItem('userEmail') || ''
   if (customerId) {
-    await itemsStore.fetchItems(customerId)
+    await Promise.all([
+      itemsStore.fetchItems(customerId),
+      categoriesStore.fetchCategories(customerId),
+      budgetStore.fetchBudget(customerId)
+    ])
   }
 })
 
 const openSlideOver = () => {
   isSlideOverOpen.value = true
+}
+
+const openBudgetModal = () => {
+  budgetInput.value = budgetStore.budget || null
+  isBudgetModalOpen.value = true
+  isUserMenuOpen.value = false
+}
+
+const closeBudgetModal = () => {
+  isBudgetModalOpen.value = false
+  budgetInput.value = null
+}
+
+const handleBudgetSave = async () => {
+  if (budgetInput.value === null || budgetInput.value < 0) return
+
+  const customerId = currentUser.value?.email || localStorage.getItem('userEmail') || ''
+  if (!customerId) return
+
+  try {
+    await budgetStore.saveBudget(customerId, budgetInput.value)
+    closeBudgetModal()
+  } catch (e) {
+    alert(e instanceof Error ? e.message : '予算の登録に失敗しました')
+  }
 }
 
 const closeSlideOver = () => {
@@ -191,10 +226,10 @@ const handleSubmit = async () => {
   isSubmitting.value = true
 
   try {
-    const selectedProductData = products.find(p => p.id === selectedProduct.value)
+    const selectedProductData = products.value.find(p => p.category_id === selectedProduct.value)
     const customerId = currentUser.value?.email || 'anonymous'
 
-    await itemsStore.addItem(customerId, selectedProductData?.id || '', price.value)
+    await itemsStore.addItem(customerId, selectedProductData?.category_id || '', price.value)
 
     showSuccess.value = true
 
@@ -221,7 +256,7 @@ const handleSubmit = async () => {
         <div class="flex items-center justify-between">
           <div>
             <h1 class="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-3xl font-bold tracking-tight text-transparent">
-              Dashboard
+              AI 家計簿
             </h1>
             <p class="mt-1 text-sm text-gray-500">費用データの概要とトレンド分析</p>
           </div>
@@ -252,6 +287,24 @@ const handleSubmit = async () => {
                 <p class="truncate text-sm font-medium text-gray-900">{{ userEmail }}</p>
               </div>
               <button
+                @click="router.push('/categories')"
+                class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100"
+              >
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+                カテゴリ管理
+              </button>
+              <button
+                @click="openBudgetModal"
+                class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100"
+              >
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                予算設定
+              </button>
+              <button
                 @click="logout"
                 class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100"
               >
@@ -278,6 +331,7 @@ const handleSubmit = async () => {
           :title="stat.title"
           :value="stat.value"
           :icon="stat.icon"
+          :subtitle="stat.subtitle"
           :trend="stat.trend"
           :color="stat.color"
           :style="{ animationDelay: `${index * 100}ms` }"
@@ -434,7 +488,7 @@ const handleSubmit = async () => {
                     class="w-full appearance-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 pr-10 text-gray-900 transition-all focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                   >
                     <option value="" disabled>商品を選択</option>
-                    <option v-for="product in products" :key="product.id" :value="product.id">
+                    <option v-for="product in products" :key="product.category_id" :value="product.category_id">
                       {{ product.name }}
                     </option>
                   </select>
@@ -496,6 +550,57 @@ const handleSubmit = async () => {
                 </span>
               </button>
             </div>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- Budget Modal -->
+    <Transition name="fade">
+      <div v-if="isBudgetModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" @click.self="closeBudgetModal">
+        <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+          <div class="mb-6 flex items-center gap-3">
+            <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 text-white">
+              <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-xl font-bold text-gray-800">月間予算設定</h3>
+              <p class="text-sm text-gray-500">1ヶ月の予算を設定してください</p>
+            </div>
+          </div>
+          <div class="mb-6">
+            <label class="mb-2 block text-sm font-medium text-gray-700">予算額</label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-500">¥</span>
+              <input
+                v-model.number="budgetInput"
+                type="number"
+                min="0"
+                step="1000"
+                placeholder="100000"
+                class="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 pl-8 pr-4 text-gray-900 transition-all focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              />
+            </div>
+            <p v-if="budgetInput" class="mt-2 text-sm text-gray-500">
+              {{ new Intl.NumberFormat('ja-JP').format(budgetInput) }} 円
+            </p>
+          </div>
+          <div class="flex gap-3">
+            <button
+              @click="closeBudgetModal"
+              class="flex-1 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 transition-all hover:bg-gray-50"
+            >
+              キャンセル
+            </button>
+            <button
+              @click="handleBudgetSave"
+              :disabled="budgetInput === null || budgetInput < 0 || budgetStore.isLoading"
+              class="flex-1 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-3 text-sm font-medium text-white transition-all hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50"
+            >
+              {{ budgetStore.isLoading ? '保存中...' : '保存する' }}
+            </button>
           </div>
         </div>
       </div>

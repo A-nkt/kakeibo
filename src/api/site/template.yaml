@@ -23,6 +23,8 @@ Globals:
       Variables:
         ENVIRONMENT: !Ref Environment
         TABLE_NAME: !Sub '${Environment}-app-item-table'
+        CATEGORY_TABLE_NAME: !Sub '${Environment}-app-category-table'
+        CUSTOMER_TABLE_NAME: !Sub '${Environment}-app-customers-table'
 
 Resources:
   FunctionRole:
@@ -51,7 +53,10 @@ Resources:
                   - dynamodb:DeleteItem
                   - dynamodb:Query
                   - dynamodb:Scan
-                Resource: !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Environment}-app-item-table'
+                Resource:
+                  - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Environment}-app-item-table'
+                  - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Environment}-app-category-table'
+                  - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Environment}-app-customers-table'
 
   Function:
     Type: AWS::Serverless::Function
@@ -78,6 +83,42 @@ Resources:
             RestApiId: !Ref Api
             Path: /api/v1/item/list
             Method: GET
+        CategoryRegister:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /api/v1/category/regist
+            Method: POST
+        CategoryList:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /api/v1/category/list
+            Method: GET
+        CategoryDelete:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /api/v1/category/delete
+            Method: DELETE
+        CategoryUpdate:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /api/v1/category/update
+            Method: PUT
+        BudgetRegister:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /api/v1/customer/budget/regist
+            Method: POST
+        BudgetGet:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /api/v1/customer/budget
+            Method: GET
 
   FunctionLogGroup:
     Type: AWS::Logs::LogGroup
@@ -94,7 +135,7 @@ Resources:
       StageName: v1
       Cors:
         AllowOrigin: "'*'"
-        AllowMethods: "'GET, POST, OPTIONS'"
+        AllowMethods: "'GET, POST, PUT, DELETE, OPTIONS'"
         AllowHeaders: "'Content-Type'"
 
 Outputs:
