@@ -4,19 +4,25 @@ interface RegistItemParams {
   customerId: string
   itemId: string
   price: number | null
+  isFixed?: boolean
+  name?: string
 }
 
-export async function registItem({ customerId, itemId, price }: RegistItemParams) {
+export async function registItem({ customerId, itemId, price, isFixed, name }: RegistItemParams) {
+  const body: Record<string, unknown> = {
+    customer_id: customerId,
+    id: itemId,
+    price,
+  }
+  if (isFixed !== undefined) body.is_fixed = isFixed
+  if (name !== undefined) body.name = name
+
   const response = await fetch(`${API_BASE_URL}/api/v1/item/regist`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      customer_id: customerId,
-      id: itemId,
-      price,
-    }),
+    body: JSON.stringify(body),
   })
 
   if (!response.ok) {
@@ -33,6 +39,55 @@ export async function getItems(customerId: string) {
   if (!response.ok) {
     const errorData = await response.json()
     throw new Error(errorData.message || '取得に失敗しました')
+  }
+
+  return response.json()
+}
+
+export async function updateItem(params: {
+  customerId: string
+  itemId: string
+  categoryId: string
+  price: number
+  created: number
+  isFixed?: boolean
+  name?: string
+}) {
+  const body: Record<string, unknown> = {
+    customer_id: params.customerId,
+    item_id: params.itemId,
+    id: params.categoryId,
+    price: params.price,
+    created: params.created,
+  }
+  if (params.isFixed !== undefined) body.is_fixed = params.isFixed
+  if (params.name !== undefined) body.name = params.name
+
+  const response = await fetch(`${API_BASE_URL}/api/v1/item/update`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json()
+    throw new Error(errorData.message || '更新に失敗しました')
+  }
+
+  return response.json()
+}
+
+export async function deleteItem(customerId: string, itemId: string) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/v1/item/delete?customer_id=${encodeURIComponent(customerId)}&item_id=${encodeURIComponent(itemId)}`,
+    { method: 'DELETE' },
+  )
+
+  if (!response.ok) {
+    const errorData = await response.json()
+    throw new Error(errorData.message || '削除に失敗しました')
   }
 
   return response.json()
