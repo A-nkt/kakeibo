@@ -29,23 +29,43 @@ const price = ref<number | null>(null)
 
 const products = computed(() => categoriesStore.categories)
 
+const tableTab = ref<'variable' | 'fixed'>('variable')
+
 // テーブル用のカラム定義
-const tableColumns = [
+const variableTableColumns = [
   { key: 'item_name', label: 'カテゴリ', width: '150px' },
   { key: 'price', label: '金額', width: '120px' },
   { key: 'created_date', label: '登録日', width: '120px' },
 ]
 
-// itemsをテーブル表示用に変換
-const tableRows = computed(() => {
-  return [...itemsStore.items].sort((a, b) => a.created - b.created).map(item => {
-    const product = products.value.find(p => p.category_id === item.id)
-    return {
-      item_name: product?.name || item.id,
+const fixedTableColumns = [
+  { key: 'item_name', label: '項目名', width: '150px' },
+  { key: 'price', label: '金額', width: '120px' },
+]
+
+// 変動費テーブル
+const variableTableRows = computed(() => {
+  return [...itemsStore.items]
+    .filter(item => item.is_fixed !== true)
+    .sort((a, b) => a.created - b.created)
+    .map(item => {
+      const product = products.value.find(p => p.category_id === item.id)
+      return {
+        item_name: product?.name || item.id,
+        price: item.price,
+        created_date: new Date(item.created * 1000).toLocaleDateString('ja-JP'),
+      }
+    })
+})
+
+// 固定費テーブル
+const fixedTableRows = computed(() => {
+  return itemsStore.items
+    .filter(item => item.is_fixed === true)
+    .map(item => ({
+      item_name: item.name || '固定費',
       price: item.price,
-      created_date: new Date(item.created * 1000).toLocaleDateString('ja-JP'),
-    }
-  })
+    }))
 })
 
 // 統計カード用のデータ
@@ -123,20 +143,54 @@ const getDateKey = (timestamp: number, period: 'daily' | 'weekly' | 'monthly') =
 const chartData = computed(() => {
   const items = itemsStore.items
   const period = chartPeriod.value
-  
-  // 期間ごとに集計
+
+  if (period === 'monthly') {
+    // 月次: 固定費/変動費を分離して2データセット
+    const fixedGrouped: Record<string, number> = {}
+    const variableGrouped: Record<string, number> = {}
+    items.forEach(item => {
+      const key = getDateKey(item.created, period)
+      if (item.is_fixed === true) {
+        fixedGrouped[key] = (fixedGrouped[key] || 0) + item.price
+      } else {
+        variableGrouped[key] = (variableGrouped[key] || 0) + item.price
+      }
+    })
+
+    const allKeys = new Set([...Object.keys(fixedGrouped), ...Object.keys(variableGrouped)])
+    const sortedKeys = [...allKeys].sort((a, b) => a.localeCompare(b)).slice(-10)
+
+    return {
+      labels: sortedKeys,
+      datasets: [
+        {
+          label: '固定費',
+          data: sortedKeys.map(key => fixedGrouped[key] || 0),
+          backgroundColor: 'rgba(239, 68, 68, 0.8)',
+          borderColor: 'rgb(239, 68, 68)',
+          borderWidth: 1,
+        },
+        {
+          label: '変動費',
+          data: sortedKeys.map(key => variableGrouped[key] || 0),
+          backgroundColor: 'rgba(99, 102, 241, 0.8)',
+          borderColor: 'rgb(99, 102, 241)',
+          borderWidth: 1,
+        },
+      ],
+    }
+  }
+
+  // 日次・週次: 固定費を除外
+  const variableItems = items.filter(item => item.is_fixed !== true)
   const grouped: Record<string, number> = {}
-  items.forEach(item => {
+  variableItems.forEach(item => {
     const key = getDateKey(item.created, period)
     grouped[key] = (grouped[key] || 0) + item.price
   })
-  
-  // ソートしてラベルとデータを取得
-  const sortedKeys = Object.keys(grouped).sort((a, b) => {
-    // 日付順にソート
-    return a.localeCompare(b)
-  }).slice(-10) // 直近10件
-  
+
+  const sortedKeys = Object.keys(grouped).sort((a, b) => a.localeCompare(b)).slice(-10)
+
   return {
     labels: sortedKeys,
     datasets: [{
@@ -144,8 +198,8 @@ const chartData = computed(() => {
       data: sortedKeys.map(key => grouped[key] || 0),
       backgroundColor: 'rgba(99, 102, 241, 0.8)',
       borderColor: 'rgb(99, 102, 241)',
-      borderWidth: 1
-    }]
+      borderWidth: 1,
+    }],
   }
 })
 
@@ -357,6 +411,7 @@ const handleSubmit = async () => {
             :labels="currentLabels"
             :datasets="currentDatasets"
             :show-legend="true"
+            :stacked="chartPeriod === 'monthly'"
           />
         </div>
 
@@ -369,7 +424,43 @@ const handleSubmit = async () => {
             <h2 class="text-lg font-semibold text-gray-800">支出一覧</h2>
             <span v-if="itemsStore.isLoading" class="text-xs text-gray-500">読み込み中...</span>
           </div>
-          <DataTable ref="dataTableRef" :columns="tableColumns" :rows="tableRows" empty-message="登録された支出はありません" />
+          <div class="mb-4 flex gap-1 rounded-lg bg-gray-100 p-1">
+            <button
+              @click="tableTab = 'variable'"
+              :class="[
+                'rounded-md px-3 py-1 text-xs font-medium transition-all',
+                tableTab === 'variable'
+                  ? 'bg-white text-indigo-700 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              ]"
+            >
+              変動費
+            </button>
+            <button
+              @click="tableTab = 'fixed'"
+              :class="[
+                'rounded-md px-3 py-1 text-xs font-medium transition-all',
+                tableTab === 'fixed'
+                  ? 'bg-white text-red-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              ]"
+            >
+              固定費
+            </button>
+          </div>
+          <DataTable
+            v-if="tableTab === 'variable'"
+            ref="dataTableRef"
+            :columns="variableTableColumns"
+            :rows="variableTableRows"
+            empty-message="登録された変動費はありません"
+          />
+          <DataTable
+            v-else
+            :columns="fixedTableColumns"
+            :rows="fixedTableRows"
+            empty-message="登録された固定費はありません"
+          />
         </div>
       </div>
     </main>

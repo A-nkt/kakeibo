@@ -19,11 +19,13 @@ interface Props {
   datasets: ChartDataset[]
   title?: string
   showLegend?: boolean
+  stacked?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   title: '',
-  showLegend: true
+  showLegend: true,
+  stacked: false
 })
 
 const chartData = computed(() => ({
@@ -31,12 +33,11 @@ const chartData = computed(() => ({
   datasets: props.datasets.map((dataset) => ({
     label: dataset.label,
     data: dataset.data,
-    backgroundColor: 'hsla(230, 70%, 55%, 0.8)',
-    borderColor: 'hsla(230, 70%, 55%, 1)',
+    backgroundColor: dataset.backgroundColor || 'hsla(230, 70%, 55%, 0.8)',
+    borderColor: dataset.borderColor || 'hsla(230, 70%, 55%, 1)',
     borderWidth: 0,
-    borderRadius: 6,
-    borderSkipped: false,
-    hoverBackgroundColor: 'hsla(230, 70%, 45%, 0.9)'
+    borderRadius: props.stacked ? 0 : 6,
+    borderSkipped: props.stacked ? 'start' as const : false,
   }))
 }))
 
@@ -49,7 +50,7 @@ const chartOptions = computed(() => ({
   },
   plugins: {
     legend: {
-      display: false
+      display: props.showLegend
     },
     title: {
       display: !!props.title,
@@ -75,11 +76,13 @@ const chartOptions = computed(() => ({
   scales: {
     x: {
       display: true,
+      stacked: props.stacked,
       grid: { display: false },
       ticks: { font: { size: 11 }, color: '#6B7280' }
     },
     y: {
       display: true,
+      stacked: props.stacked,
       beginAtZero: true,
       grid: { color: 'rgba(229, 231, 235, 0.4)', drawBorder: false },
       ticks: {

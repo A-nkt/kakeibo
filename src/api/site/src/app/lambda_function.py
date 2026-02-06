@@ -86,6 +86,10 @@ def post_item() -> Response[str]:
             'created': now,
             'updated': now,
         }
+        if 'is_fixed' in body:
+            item['is_fixed'] = body['is_fixed']
+        if 'name' in body:
+            item['name'] = body['name']
 
         table.put_item(Item=item)
         logger.info('Item registered successfully', extra={'item_id': item['item_id']})
@@ -159,6 +163,15 @@ def update_item() -> Response[str]:
             update_parts.append('created = :created')
             attr_values[':created'] = body['created']
 
+        if 'is_fixed' in body:
+            update_parts.append('is_fixed = :is_fixed')
+            attr_values[':is_fixed'] = body['is_fixed']
+
+        if 'name' in body:
+            update_parts.append('#name = :name')
+            attr_names['#name'] = 'name'
+            attr_values[':name'] = body['name']
+
         update_parts.append('updated = :updated')
 
         update_expression = 'SET ' + ', '.join(update_parts)
@@ -181,6 +194,35 @@ def update_item() -> Response[str]:
     except json.JSONDecodeError as e:
         logger.error('JSON decode error', extra={'error': str(e)})
         return response_error(400, 'Invalid JSON')
+    except ClientError as e:
+        logger.error('DynamoDB error', extra={'error': str(e)})
+        return response_error(502, 'Database error')
+    except Exception as e:
+        logger.error('Internal server error', extra={'error': str(e)})
+        return response_error(500, 'Internal server error')
+
+
+@app.delete('/api/v1/item/delete')
+def delete_item() -> Response[str]:
+    try:
+        customer_id = app.current_event.get_query_string_value('customer_id')
+        item_id = app.current_event.get_query_string_value('item_id')
+        logger.info('DELETE item request received', extra={'customer_id': customer_id, 'item_id': item_id})
+
+        if not customer_id:
+            return response_error(400, 'Missing required parameter: customer_id')
+        if not item_id:
+            return response_error(400, 'Missing required parameter: item_id')
+
+        table.delete_item(
+            Key={
+                'customer_id': customer_id,
+                'item_id': item_id
+            }
+        )
+        logger.info('Item deleted successfully', extra={'item_id': item_id})
+        return response_result(result={'deleted': True})
+
     except ClientError as e:
         logger.error('DynamoDB error', extra={'error': str(e)})
         return response_error(502, 'Database error')
