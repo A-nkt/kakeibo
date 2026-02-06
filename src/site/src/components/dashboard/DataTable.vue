@@ -62,11 +62,21 @@ const formatNumber = (value: string | number | undefined) => {
   }
   return value ?? ''
 }
+
+const scrollContainer = ref<HTMLElement | null>(null)
+
+const scrollToBottom = () => {
+  if (scrollContainer.value) {
+    scrollContainer.value.scrollTop = scrollContainer.value.scrollHeight
+  }
+}
+
+defineExpose({ scrollToBottom })
 </script>
 
 <template>
   <div class="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-lg">
-    <div class="max-h-80 overflow-auto">
+    <div ref="scrollContainer" class="max-h-80 overflow-auto">
       <table class="min-w-full">
         <thead class="sticky top-0 z-10">
           <tr class="bg-gradient-to-r from-gray-50 to-gray-100">

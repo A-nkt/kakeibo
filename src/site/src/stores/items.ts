@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
-import { getItems, registItem } from '@/utils/api'
+import { getItems, registItem, updateItem } from '@/utils/api'
 
 interface Item {
   id: string
@@ -48,5 +48,26 @@ export const useItemsStore = defineStore('items', () => {
     }
   }
 
-  return { items, isLoading, error, fetchItems, addItem }
+  async function editItem(
+    customerId: string,
+    itemId: string,
+    categoryId: string,
+    price: number,
+    created: number,
+  ) {
+    isLoading.value = true
+    error.value = null
+
+    try {
+      await updateItem({ customerId, itemId, categoryId, price, created })
+      await fetchItems(customerId)
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : '更新に失敗しました'
+      throw e
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  return { items, isLoading, error, fetchItems, addItem, editItem }
 })

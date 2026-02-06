@@ -83,6 +83,12 @@ Resources:
             RestApiId: !Ref Api
             Path: /api/v1/item/list
             Method: GET
+        ItemUpdate:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /api/v1/item/update
+            Method: PUT
         CategoryRegister:
           Type: Api
           Properties:

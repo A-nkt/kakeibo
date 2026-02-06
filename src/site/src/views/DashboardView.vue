@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useItemsStore } from '@/stores/items'
@@ -19,14 +19,13 @@ const isLoaded = ref(false)
 const chartPeriod = ref<'daily' | 'weekly' | 'monthly'>('daily')
 const isUserMenuOpen = ref(false)
 
+const dataTableRef = ref<InstanceType<typeof DataTable> | null>(null)
+
 const isSlideOverOpen = ref(false)
 const isSubmitting = ref(false)
 const showSuccess = ref(false)
 const selectedProduct = ref('')
 const price = ref<number | null>(null)
-
-const isBudgetModalOpen = ref(false)
-const budgetInput = ref<number | null>(null)
 
 const products = computed(() => categoriesStore.categories)
 
@@ -39,7 +38,7 @@ const tableColumns = [
 
 // itemsをテーブル表示用に変換
 const tableRows = computed(() => {
-  return itemsStore.items.map(item => {
+  return [...itemsStore.items].sort((a, b) => a.created - b.created).map(item => {
     const product = products.value.find(p => p.category_id === item.id)
     return {
       item_name: product?.name || item.id,
@@ -183,36 +182,13 @@ onMounted(async () => {
       categoriesStore.fetchCategories(customerId),
       budgetStore.fetchBudget(customerId)
     ])
+    await nextTick()
+    dataTableRef.value?.scrollToBottom()
   }
 })
 
 const openSlideOver = () => {
   isSlideOverOpen.value = true
-}
-
-const openBudgetModal = () => {
-  budgetInput.value = budgetStore.budget || null
-  isBudgetModalOpen.value = true
-  isUserMenuOpen.value = false
-}
-
-const closeBudgetModal = () => {
-  isBudgetModalOpen.value = false
-  budgetInput.value = null
-}
-
-const handleBudgetSave = async () => {
-  if (budgetInput.value === null || budgetInput.value < 0) return
-
-  const customerId = currentUser.value?.email || localStorage.getItem('userEmail') || ''
-  if (!customerId) return
-
-  try {
-    await budgetStore.saveBudget(customerId, budgetInput.value)
-    closeBudgetModal()
-  } catch (e) {
-    alert(e instanceof Error ? e.message : '予算の登録に失敗しました')
-  }
 }
 
 const closeSlideOver = () => {
@@ -287,22 +263,14 @@ const handleSubmit = async () => {
                 <p class="truncate text-sm font-medium text-gray-900">{{ userEmail }}</p>
               </div>
               <button
-                @click="router.push('/categories')"
+                @click="router.push('/settings')"
                 class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100"
               >
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                カテゴリ管理
-              </button>
-              <button
-                @click="openBudgetModal"
-                class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100"
-              >
-                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                予算設定
+                各種設定
               </button>
               <button
                 @click="logout"
@@ -401,7 +369,7 @@ const handleSubmit = async () => {
             <h2 class="text-lg font-semibold text-gray-800">支出一覧</h2>
             <span v-if="itemsStore.isLoading" class="text-xs text-gray-500">読み込み中...</span>
           </div>
-          <DataTable :columns="tableColumns" :rows="tableRows" empty-message="登録された支出はありません" />
+          <DataTable ref="dataTableRef" :columns="tableColumns" :rows="tableRows" empty-message="登録された支出はありません" />
         </div>
       </div>
     </main>
@@ -555,56 +523,6 @@ const handleSubmit = async () => {
       </div>
     </Transition>
 
-    <!-- Budget Modal -->
-    <Transition name="fade">
-      <div v-if="isBudgetModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" @click.self="closeBudgetModal">
-        <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-          <div class="mb-6 flex items-center gap-3">
-            <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 text-white">
-              <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div>
-              <h3 class="text-xl font-bold text-gray-800">月間予算設定</h3>
-              <p class="text-sm text-gray-500">1ヶ月の予算を設定してください</p>
-            </div>
-          </div>
-          <div class="mb-6">
-            <label class="mb-2 block text-sm font-medium text-gray-700">予算額</label>
-            <div class="relative">
-              <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-500">¥</span>
-              <input
-                v-model.number="budgetInput"
-                type="number"
-                min="0"
-                step="1000"
-                placeholder="100000"
-                class="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 pl-8 pr-4 text-gray-900 transition-all focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-              />
-            </div>
-            <p v-if="budgetInput" class="mt-2 text-sm text-gray-500">
-              {{ new Intl.NumberFormat('ja-JP').format(budgetInput) }} 円
-            </p>
-          </div>
-          <div class="flex gap-3">
-            <button
-              @click="closeBudgetModal"
-              class="flex-1 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 transition-all hover:bg-gray-50"
-            >
-              キャンセル
-            </button>
-            <button
-              @click="handleBudgetSave"
-              :disabled="budgetInput === null || budgetInput < 0 || budgetStore.isLoading"
-              class="flex-1 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-3 text-sm font-medium text-white transition-all hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50"
-            >
-              {{ budgetStore.isLoading ? '保存中...' : '保存する' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Transition>
   </div>
 </template>
 

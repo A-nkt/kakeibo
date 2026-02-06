@@ -38,6 +38,35 @@ export async function getItems(customerId: string) {
   return response.json()
 }
 
+export async function updateItem(params: {
+  customerId: string
+  itemId: string
+  categoryId: string
+  price: number
+  created: number
+}) {
+  const response = await fetch(`${API_BASE_URL}/api/v1/item/update`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      customer_id: params.customerId,
+      item_id: params.itemId,
+      id: params.categoryId,
+      price: params.price,
+      created: params.created,
+    }),
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json()
+    throw new Error(errorData.message || '更新に失敗しました')
+  }
+
+  return response.json()
+}
+
 // Category API
 export async function getCategories(customerId: string) {
   const response = await fetch(`${API_BASE_URL}/api/v1/category/list?customer_id=${encodeURIComponent(customerId)}`)
