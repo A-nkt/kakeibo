@@ -128,6 +128,67 @@ def get_items() -> Response[str]:
         return response_error(500, 'Internal server error')
 
 
+@app.put('/api/v1/item/update')
+def update_item() -> Response[str]:
+    try:
+        body = app.current_event.json_body
+        logger.info('PUT item request received', extra={'request_body': body})
+
+        required_fields = ['customer_id', 'item_id']
+        for field in required_fields:
+            if field not in body:
+                logger.warning('Missing required field', extra={'field': field})
+                return response_error(400, f'Missing required field: {field}')
+
+        now = int(datetime.utcnow().timestamp())
+
+        update_parts = []
+        attr_names = {}
+        attr_values = {':updated': now}
+
+        if 'id' in body:
+            update_parts.append('#id = :id')
+            attr_names['#id'] = 'id'
+            attr_values[':id'] = body['id']
+
+        if 'price' in body:
+            update_parts.append('price = :price')
+            attr_values[':price'] = body['price']
+
+        if 'created' in body:
+            update_parts.append('created = :created')
+            attr_values[':created'] = body['created']
+
+        update_parts.append('updated = :updated')
+
+        update_expression = 'SET ' + ', '.join(update_parts)
+
+        update_kwargs: dict[str, Any] = {
+            'Key': {
+                'customer_id': body['customer_id'],
+                'item_id': body['item_id']
+            },
+            'UpdateExpression': update_expression,
+            'ExpressionAttributeValues': attr_values
+        }
+        if attr_names:
+            update_kwargs['ExpressionAttributeNames'] = attr_names
+
+        table.update_item(**update_kwargs)
+        logger.info('Item updated successfully', extra={'item_id': body['item_id']})
+        return response_result(result={'updated': True})
+
+    except json.JSONDecodeError as e:
+        logger.error('JSON decode error', extra={'error': str(e)})
+        return response_error(400, 'Invalid JSON')
+    except ClientError as e:
+        logger.error('DynamoDB error', extra={'error': str(e)})
+        return response_error(502, 'Database error')
+    except Exception as e:
+        logger.error('Internal server error', extra={'error': str(e)})
+        return response_error(500, 'Internal server error')
+
+
 # --------------------------------------------------------------------------------------------------
 # Category API
 # --------------------------------------------------------------------------------------------------
