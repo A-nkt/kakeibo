@@ -59,6 +59,7 @@ const editingItem = ref<{
   categoryId: string
   price: number | null
   created: string
+  memo: string
 } | null>(null)
 
 const categories = computed(() => categoriesStore.categories)
@@ -73,6 +74,7 @@ const variableItemRows = computed(() => {
       return {
         item_name: product?.name || item.id,
         price: item.price,
+        memo: item.memo || '',
         created_date: new Date(item.created * 1000).toLocaleDateString('ja-JP'),
         item_id: item.item_id,
         category_id: item.id,
@@ -173,6 +175,7 @@ const openEditItemModal = (row: typeof variableItemRows.value[number]) => {
     categoryId: row.category_id,
     price: row.price,
     created: `${yyyy}-${mm}-${dd}`,
+    memo: row.memo,
   }
   isEditItemModalOpen.value = true
 }
@@ -195,6 +198,7 @@ const handleEditItemSave = async () => {
       editingItem.value.categoryId,
       editingItem.value.price,
       createdTimestamp,
+      editingItem.value.memo || undefined,
     )
     closeEditItemModal()
   } catch (e) {
@@ -429,6 +433,7 @@ const goBack = () => {
                   <tr class="bg-gradient-to-r from-gray-50 to-gray-100">
                     <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 sm:px-6">カテゴリ</th>
                     <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 sm:px-6" style="width: 120px">金額</th>
+                    <th class="hidden px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 sm:table-cell" style="width: 150px">メモ</th>
                     <th class="hidden px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 sm:table-cell" style="width: 120px">登録日</th>
                     <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 sm:px-6" style="width: 60px"></th>
                   </tr>
@@ -441,6 +446,7 @@ const goBack = () => {
                   >
                     <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-700 sm:px-6">{{ row.item_name }}</td>
                     <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-600 sm:px-6">¥{{ row.price.toLocaleString() }}</td>
+                    <td class="hidden max-w-[150px] truncate px-6 py-3 text-sm text-gray-500 sm:table-cell" :title="row.memo">{{ row.memo }}</td>
                     <td class="hidden whitespace-nowrap px-6 py-3 text-sm text-gray-700 sm:table-cell">{{ row.created_date }}</td>
                     <td class="whitespace-nowrap px-4 py-3 text-sm sm:px-6">
                       <button
@@ -454,7 +460,7 @@ const goBack = () => {
                     </td>
                   </tr>
                   <tr v-if="variableItemRows.length === 0">
-                    <td colspan="4" class="px-6 py-12 text-center">
+                    <td colspan="5" class="px-6 py-12 text-center">
                       <div class="flex flex-col items-center gap-2 text-gray-400">
                         <svg class="h-10 w-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
@@ -786,6 +792,15 @@ const goBack = () => {
                 type="date"
                 class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-900 transition-all focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               />
+            </div>
+            <div>
+              <label class="mb-2 block text-sm font-medium text-gray-700">メモ</label>
+              <textarea
+                v-model="editingItem.memo"
+                rows="3"
+                placeholder="メモを入力（任意）"
+                class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-900 transition-all focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              ></textarea>
             </div>
           </div>
           <div class="flex gap-3">

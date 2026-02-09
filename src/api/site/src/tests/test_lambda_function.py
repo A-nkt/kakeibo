@@ -8,7 +8,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-os.environ['TABLE_NAME'] = 'test-item-table'
+os.environ['ITEM_TABLE_NAME'] = 'test-item-table'
 os.environ['CATEGORY_TABLE_NAME'] = 'test-category-table'
 os.environ['CUSTOMER_TABLE_NAME'] = 'test-customer-table'
 os.environ['POWERTOOLS_LOG_LEVEL'] = 'CRITICAL'
@@ -75,6 +75,25 @@ def test_post_item_success(mock_table, context):
 
 
 @patch('app.lambda_function.table')
+def test_post_item_with_memo(mock_table, context):
+    mock_table.put_item.return_value = {}
+
+    event = build_apigw_event(
+        'POST',
+        '/api/v1/item/regist',
+        body={'customer_id': 'cust-1', 'id': 'cat-1', 'price': 1000, 'memo': 'ランチ代'},
+    )
+    response = lambda_handler(event, context)
+
+    assert response['statusCode'] == 200
+    body = json.loads(response['body'])
+    assert 'item_id' in body['result']
+    mock_table.put_item.assert_called_once()
+    put_item_args = mock_table.put_item.call_args
+    assert put_item_args[1]['Item']['memo'] == 'ランチ代'
+
+
+@patch('app.lambda_function.table')
 def test_get_items_success(mock_table, context):
     mock_table.query.return_value = {
         'Items': [
@@ -110,6 +129,26 @@ def test_update_item_success(mock_table, context):
     body = json.loads(response['body'])
     assert body['result']['updated'] is True
     mock_table.update_item.assert_called_once()
+
+
+@patch('app.lambda_function.table')
+def test_update_item_with_memo(mock_table, context):
+    mock_table.update_item.return_value = {}
+
+    event = build_apigw_event(
+        'PUT',
+        '/api/v1/item/update',
+        body={'customer_id': 'cust-1', 'item_id': 'item-1', 'price': 2000, 'memo': 'ディナー代'},
+    )
+    response = lambda_handler(event, context)
+
+    assert response['statusCode'] == 200
+    body = json.loads(response['body'])
+    assert body['result']['updated'] is True
+    update_args = mock_table.update_item.call_args
+    assert ':memo' in update_args[1]['ExpressionAttributeValues']
+    assert update_args[1]['ExpressionAttributeValues'][':memo'] == 'ディナー代'
+    assert 'memo = :memo' in update_args[1]['UpdateExpression']
 
 
 @patch('app.lambda_function.table')

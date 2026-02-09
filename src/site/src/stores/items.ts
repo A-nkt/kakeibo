@@ -11,6 +11,7 @@ interface Item {
   updated: number
   is_fixed?: boolean
   name?: string
+  memo?: string
 }
 
 export const useItemsStore = defineStore('items', () => {
@@ -35,12 +36,12 @@ export const useItemsStore = defineStore('items', () => {
     }
   }
 
-  async function addItem(customerId: string, itemId: string, price: number | null) {
+  async function addItem(customerId: string, itemId: string, price: number | null, memo?: string) {
     isLoading.value = true
     error.value = null
 
     try {
-      await registItem({ customerId, itemId, price })
+      await registItem({ customerId, itemId, price, memo })
       await fetchItems(customerId)
     } catch (e) {
       error.value = e instanceof Error ? e.message : '登録に失敗しました'
@@ -56,12 +57,13 @@ export const useItemsStore = defineStore('items', () => {
     categoryId: string,
     price: number,
     created: number,
+    memo?: string,
   ) {
     isLoading.value = true
     error.value = null
 
     try {
-      await updateItem({ customerId, itemId, categoryId, price, created })
+      await updateItem({ customerId, itemId, categoryId, price, created, memo })
       await fetchItems(customerId)
     } catch (e) {
       error.value = e instanceof Error ? e.message : '更新に失敗しました'
