@@ -89,6 +89,12 @@ Resources:
             RestApiId: !Ref Api
             Path: /api/v1/item/update
             Method: PUT
+        ItemDelete:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /api/v1/item/delete
+            Method: DELETE
         CategoryRegister:
           Type: Api
           Properties:
