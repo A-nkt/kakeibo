@@ -14,9 +14,9 @@ from aws_lambda_powertools.logging import Logger
 from aws_lambda_powertools.logging.correlation_paths import API_GATEWAY_REST
 from aws_lambda_powertools.utilities.typing import LambdaContext
 
-from app.aws import get_aws_boto3_resource
 from app.values import Const
 from app.utils import response_result, response_error
+from app.utils.aws import get_aws_boto3_resource
 
 
 logger = Logger()
