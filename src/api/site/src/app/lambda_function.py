@@ -90,6 +90,8 @@ def post_item() -> Response[str]:
             item['is_fixed'] = body['is_fixed']
         if 'name' in body:
             item['name'] = body['name']
+        if 'memo' in body:
+            item['memo'] = body['memo']
 
         table.put_item(Item=item)
         logger.info('Item registered successfully', extra={'item_id': item['item_id']})
@@ -171,6 +173,10 @@ def update_item() -> Response[str]:
             update_parts.append('#name = :name')
             attr_names['#name'] = 'name'
             attr_values[':name'] = body['name']
+
+        if 'memo' in body:
+            update_parts.append('memo = :memo')
+            attr_values[':memo'] = body['memo']
 
         update_parts.append('updated = :updated')
 
