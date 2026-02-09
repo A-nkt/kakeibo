@@ -1,11 +1,9 @@
 import json
-import os
 import uuid
-from decimal import Decimal
+
 from typing import Any
 from datetime import datetime
 
-import boto3
 from botocore.exceptions import ClientError
 from aws_lambda_powertools.event_handler import CORSConfig
 from aws_lambda_powertools.event_handler.api_gateway import (
@@ -16,6 +14,11 @@ from aws_lambda_powertools.logging import Logger
 from aws_lambda_powertools.logging.correlation_paths import API_GATEWAY_REST
 from aws_lambda_powertools.utilities.typing import LambdaContext
 
+from app.values import Const
+from app.utils import response_result, response_error
+from app.utils.aws import get_aws_boto3_resource
+
+
 logger = Logger()
 app = APIGatewayRestResolver(
     cors=CORSConfig(
@@ -25,39 +28,10 @@ app = APIGatewayRestResolver(
     ),
 )
 
-dynamodb = boto3.resource('dynamodb')
-table = dynamodb.Table(os.environ['TABLE_NAME'])
-category_table = dynamodb.Table(os.environ['CATEGORY_TABLE_NAME'])
-customer_table = dynamodb.Table(os.environ['CUSTOMER_TABLE_NAME'])
-
-
-def decimal_default_proc(obj: Any):
-    if isinstance(obj, Decimal):
-        return float(obj)
-    raise TypeError
-
-
-def response_result(result: Any = None) -> Response[str]:
-    body = json.dumps(
-        {'result': result},
-        ensure_ascii=False,
-        default=decimal_default_proc,
-        separators=(',', ':')
-    )
-    return Response(
-        status_code=200,
-        content_type='application/json',
-        body=body,
-    )
-
-
-def response_error(status_code: int, message: str) -> Response[str]:
-    body = json.dumps({'message': message}, ensure_ascii=False)
-    return Response(
-        status_code=status_code,
-        content_type='application/json',
-        body=body,
-    )
+dynamodb = get_aws_boto3_resource()
+table = dynamodb.Table(Const.ITEM_TABLE_NAME)
+category_table = dynamodb.Table(Const.CATEGORY_TABLE_NAME)
+customer_table = dynamodb.Table(Const.CUSTOMER_TABLE_NAME)
 
 
 # --------------------------------------------------------------------------------------------------
@@ -161,7 +135,7 @@ def update_item() -> Response[str]:
             update_parts.append('price = :price')
             attr_values[':price'] = body['price']
 
-        if 'created' in body:
+        if 'created' in body and body['created']:
             update_parts.append('created = :created')
             attr_values[':created'] = body['created']
 

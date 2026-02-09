@@ -130,16 +130,18 @@ const stats = computed(() => {
 })
 
 // グラフ用のデータ
+const pad = (n: number) => String(n).padStart(2, '0')
+
 const getDateKey = (timestamp: number, period: 'daily' | 'weekly' | 'monthly') => {
   const date = new Date(timestamp * 1000)
   if (period === 'monthly') {
-    return `${date.getFullYear()}/${date.getMonth() + 1}`
+    return `${date.getFullYear()}/${pad(date.getMonth() + 1)}`
   } else if (period === 'weekly') {
     const weekStart = new Date(date)
     weekStart.setDate(date.getDate() - date.getDay())
-    return `${weekStart.getMonth() + 1}/${weekStart.getDate()}週`
+    return `${pad(weekStart.getMonth() + 1)}/${pad(weekStart.getDate())}週`
   } else {
-    return `${date.getMonth() + 1}/${date.getDate()}`
+    return `${pad(date.getMonth() + 1)}/${pad(date.getDate())}`
   }
 }
 

@@ -8,7 +8,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-os.environ['TABLE_NAME'] = 'test-item-table'
+os.environ['ITEM_TABLE_NAME'] = 'test-item-table'
 os.environ['CATEGORY_TABLE_NAME'] = 'test-category-table'
 os.environ['CUSTOMER_TABLE_NAME'] = 'test-customer-table'
 os.environ['POWERTOOLS_LOG_LEVEL'] = 'CRITICAL'

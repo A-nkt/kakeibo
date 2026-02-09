@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6DD5B0"/>
+      <stop offset="100%" stop-color="#3DB88C"/>
+    </linearGradient>
+    <linearGradient id="pigBody" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFB6C1"/>
+      <stop offset="100%" stop-color="#FF8FAB"/>
+    </linearGradient>
+    <linearGradient id="coin" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFD700"/>
+      <stop offset="100%" stop-color="#F0B800"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="245" fill="url(#bg)"/>
+
+  <!-- Piggy bank body -->
+  <ellipse cx="260" cy="290" rx="130" ry="105" fill="url(#pigBody)"/>
+
+  <!-- Piggy head -->
+  <circle cx="160" cy="260" r="70" fill="url(#pigBody)"/>
+
+  <!-- Snout -->
+  <ellipse cx="115" cy="270" rx="30" ry="22" fill="#FF9BB5"/>
+  <!-- Nostrils -->
+  <ellipse cx="108" cy="268" rx="5" ry="6" fill="#E8819A"/>
+  <ellipse cx="122" cy="268" rx="5" ry="6" fill="#E8819A"/>
+
+  <!-- Eye -->
+  <circle cx="150" cy="245" r="10" fill="#2D3436"/>
+  <circle cx="153" cy="242" r="4" fill="#FFFFFF"/>
+
+  <!-- Ear -->
+  <path d="M175 210 Q165 175 190 185 Q205 192 195 215 Z" fill="#FF8FAB"/>
+  <path d="M180 212 Q173 190 192 195 Q200 198 195 213 Z" fill="#E8819A"/>
+
+  <!-- Legs -->
+  <rect x="185" y="370" width="30" height="35" rx="10" fill="#FF8FAB"/>
+  <rect x="300" y="370" width="30" height="35" rx="10" fill="#FF8FAB"/>
+
+  <!-- Tail (curly) -->
+  <path d="M390 270 Q410 250 405 275 Q400 300 415 285 Q430 270 420 295" stroke="#FF8FAB" stroke-width="8" fill="none" stroke-linecap="round"/>
+
+  <!-- Coin slot -->
+  <rect x="235" y="188" width="50" height="8" rx="4" fill="#E8819A"/>
+
+  <!-- Coin dropping in -->
+  <circle cx="260" cy="155" r="28" fill="url(#coin)" stroke="#DAA520" stroke-width="3"/>
+  <!-- Yen symbol on coin -->
+  <text x="260" y="164" text-anchor="middle" font-size="30" font-weight="bold" fill="#B8860B" font-family="Arial, sans-serif">&#165;</text>
+
+  <!-- Sparkle effects (AI feel) -->
+  <g fill="#FFFFFF" opacity="0.9">
+    <!-- Star 1 -->
+    <polygon points="380,140 385,155 400,155 388,163 392,178 380,170 368,178 372,163 360,155 375,155"/>
+    <!-- Star 2 -->
+    <polygon points="420,195 423,204 432,204 425,209 427,218 420,213 413,218 415,209 408,204 417,204" transform="scale(0.7) translate(180, 85)"/>
+    <!-- Small dot sparkles -->
+    <circle cx="100" cy="145" r="4"/>
+    <circle cx="85" cy="165" r="2.5"/>
+    <circle cx="395" cy="120" r="3"/>
+  </g>
+</svg>
