@@ -26,6 +26,7 @@ const isSubmitting = ref(false)
 const showSuccess = ref(false)
 const selectedProduct = ref('')
 const price = ref<number | null>(null)
+const memo = ref('')
 
 const products = computed(() => categoriesStore.categories)
 
@@ -35,6 +36,7 @@ const tableTab = ref<'variable' | 'fixed'>('variable')
 const variableTableColumns = [
   { key: 'item_name', label: 'カテゴリ', width: '150px' },
   { key: 'price', label: '金額', width: '120px' },
+  { key: 'memo', label: 'メモ', width: '150px' },
   { key: 'created_date', label: '登録日', width: '120px' },
 ]
 
@@ -53,6 +55,7 @@ const variableTableRows = computed(() => {
       return {
         item_name: product?.name || item.id,
         price: item.price,
+        memo: item.memo || '',
         created_date: new Date(item.created * 1000).toLocaleDateString('ja-JP'),
       }
     })
@@ -259,7 +262,7 @@ const handleSubmit = async () => {
     const selectedProductData = products.value.find(p => p.category_id === selectedProduct.value)
     const customerId = currentUser.value?.email || 'anonymous'
 
-    await itemsStore.addItem(customerId, selectedProductData?.category_id || '', price.value)
+    await itemsStore.addItem(customerId, selectedProductData?.category_id || '', price.value, memo.value || undefined)
 
     showSuccess.value = true
 
@@ -267,6 +270,7 @@ const handleSubmit = async () => {
       showSuccess.value = false
       selectedProduct.value = ''
       price.value = null
+      memo.value = ''
       closeSlideOver()
     }, 1500)
   } catch (error) {
@@ -579,6 +583,20 @@ const handleSubmit = async () => {
                 <p v-if="price" class="mt-2 text-sm text-gray-500">
                   {{ formattedPrice }} 円
                 </p>
+              </div>
+
+              <!-- Memo Input -->
+              <div>
+                <label for="memo" class="mb-2 block text-sm font-medium text-gray-700">
+                  メモ
+                </label>
+                <textarea
+                  id="memo"
+                  v-model="memo"
+                  rows="3"
+                  placeholder="メモを入力（任意）"
+                  class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-900 transition-all focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                ></textarea>
               </div>
             </form>
           </div>

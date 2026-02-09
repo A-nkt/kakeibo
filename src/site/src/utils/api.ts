@@ -6,9 +6,10 @@ interface RegistItemParams {
   price: number | null
   isFixed?: boolean
   name?: string
+  memo?: string
 }
 
-export async function registItem({ customerId, itemId, price, isFixed, name }: RegistItemParams) {
+export async function registItem({ customerId, itemId, price, isFixed, name, memo }: RegistItemParams) {
   const body: Record<string, unknown> = {
     customer_id: customerId,
     id: itemId,
@@ -16,6 +17,7 @@ export async function registItem({ customerId, itemId, price, isFixed, name }: R
   }
   if (isFixed !== undefined) body.is_fixed = isFixed
   if (name !== undefined) body.name = name
+  if (memo !== undefined) body.memo = memo
 
   const response = await fetch(`${API_BASE_URL}/api/v1/item/regist`, {
     method: 'POST',
@@ -52,6 +54,7 @@ export async function updateItem(params: {
   created: number
   isFixed?: boolean
   name?: string
+  memo?: string
 }) {
   const body: Record<string, unknown> = {
     customer_id: params.customerId,
@@ -62,6 +65,7 @@ export async function updateItem(params: {
   }
   if (params.isFixed !== undefined) body.is_fixed = params.isFixed
   if (params.name !== undefined) body.name = params.name
+  if (params.memo !== undefined) body.memo = params.memo
 
   const response = await fetch(`${API_BASE_URL}/api/v1/item/update`, {
     method: 'PUT',
