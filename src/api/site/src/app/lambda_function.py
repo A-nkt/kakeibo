@@ -135,7 +135,7 @@ def update_item() -> Response[str]:
             update_parts.append('price = :price')
             attr_values[':price'] = body['price']
 
-        if 'created' in body:
+        if 'created' in body and body['created']:
             update_parts.append('created = :created')
             attr_values[':created'] = body['created']
 
