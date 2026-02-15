@@ -7,6 +7,7 @@ import { useCategoriesStore } from '@/stores/categories'
 import { useBudgetStore } from '@/stores/budget'
 import DataTable from '@/components/dashboard/DataTable.vue'
 import BarChart from '@/components/dashboard/BarChart.vue'
+import PieChart from '@/components/dashboard/PieChart.vue'
 import StatCard from '@/components/dashboard/StatCard.vue'
 
 const router = useRouter()
@@ -17,6 +18,7 @@ const budgetStore = useBudgetStore()
 
 const isLoaded = ref(false)
 const chartPeriod = ref<'daily' | 'weekly' | 'monthly'>('daily')
+const chartType = ref<'bar' | 'pie'>('bar')
 const isUserMenuOpen = ref(false)
 
 const dataTableRef = ref<InstanceType<typeof DataTable> | null>(null)
@@ -211,6 +213,25 @@ const chartData = computed(() => {
 const currentLabels = computed(() => chartData.value.labels)
 const currentDatasets = computed(() => chartData.value.datasets)
 
+// カテゴリ別円グラフ用のデータ
+const categoryPieData = computed(() => {
+  const items = itemsStore.items.filter(item => item.is_fixed !== true)
+  const categoryTotals: Record<string, number> = {}
+  
+  items.forEach(item => {
+    const category = products.value.find(p => p.category_id === item.id)
+    const categoryName = category?.name || item.id || '未分類'
+    categoryTotals[categoryName] = (categoryTotals[categoryName] || 0) + item.price
+  })
+  
+  const sortedEntries = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])
+  
+  return {
+    labels: sortedEntries.map(([name]) => name),
+    data: sortedEntries.map(([, value]) => value)
+  }
+})
+
 const statsGridClass = computed(() => {
   if (stats.value.length === 3) {
     return 'grid-cols-1 sm:grid-cols-3'
@@ -285,16 +306,16 @@ const handleSubmit = async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+  <div class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 lg:flex lg:h-screen lg:flex-col lg:overflow-hidden">
     <!-- Header -->
-    <header class="relative z-50 border-b border-white/20 bg-white/60 backdrop-blur-sm">
-      <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+    <header class="relative z-50 flex-shrink-0 border-b border-white/20 bg-white/60 backdrop-blur-sm">
+      <div class="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
         <div class="flex items-center justify-between">
           <div>
-            <h1 class="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-3xl font-bold tracking-tight text-transparent">
+            <h1 class="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-2xl font-bold tracking-tight text-transparent">
               AI 家計簿
             </h1>
-            <p class="mt-1 text-sm text-gray-500">費用データの概要とトレンド分析</p>
+            <p class="text-xs text-gray-500">費用データの概要とトレンド分析</p>
           </div>
           <div class="relative z-50 flex items-center gap-3">
             <!-- User Menu -->
@@ -347,10 +368,10 @@ const handleSubmit = async () => {
       </div>
     </header>
 
-    <main class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <main class="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:px-8">
       <!-- Stats Grid -->
       <div
-        class="mb-8 grid gap-4"
+        class="mb-4 grid flex-shrink-0 gap-3"
         :class="[statsGridClass, { 'animate-fade-in': isLoaded }]"
       >
         <StatCard
@@ -368,69 +389,130 @@ const handleSubmit = async () => {
       </div>
 
       <!-- Main Content Grid -->
-      <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div class="grid grid-cols-1 gap-4 lg:min-h-0 lg:max-h-[60vh] lg:flex-1 lg:grid-cols-2">
         <!-- Chart Section -->
         <div
-          class="animate-slide-up rounded-2xl border border-white/50 bg-white/80 p-6 shadow-lg backdrop-blur-sm transition-shadow hover:shadow-xl"
+          class="animate-slide-up flex flex-col rounded-2xl border border-white/50 bg-white/80 p-4 shadow-lg backdrop-blur-sm transition-shadow hover:shadow-xl lg:min-h-0"
           :style="{ animationDelay: '400ms' }"
         >
-          <div class="mb-4 flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-gray-800">コスト推移</h2>
-            <div class="flex gap-1 rounded-lg bg-gray-100 p-1">
-              <button
-                @click="chartPeriod = 'daily'"
-                :class="[
-                  'rounded-md px-3 py-1 text-xs font-medium transition-all',
-                  chartPeriod === 'daily'
-                    ? 'bg-white text-indigo-700 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                ]"
-              >
-                日別
-              </button>
-              <button
-                @click="chartPeriod = 'weekly'"
-                :class="[
-                  'rounded-md px-3 py-1 text-xs font-medium transition-all',
-                  chartPeriod === 'weekly'
-                    ? 'bg-white text-indigo-700 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                ]"
-              >
-                週次
-              </button>
-              <button
-                @click="chartPeriod = 'monthly'"
-                :class="[
-                  'rounded-md px-3 py-1 text-xs font-medium transition-all',
-                  chartPeriod === 'monthly'
-                    ? 'bg-white text-indigo-700 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                ]"
-              >
-                月次
-              </button>
+          <div class="mb-2 flex flex-shrink-0 items-center justify-between">
+            <h2 class="text-base font-semibold text-gray-800">コスト推移</h2>
+            <div class="flex items-center gap-2">
+              <!-- 期間切り替え（棒グラフのみ） -->
+              <div v-if="chartType === 'bar'" class="flex gap-1 rounded-lg bg-gray-100 p-1">
+                <div class="group relative">
+                  <button
+                    @click="chartPeriod = 'daily'"
+                    :class="[
+                      'rounded-md px-3 py-1 text-xs font-medium transition-all',
+                      chartPeriod === 'daily'
+                        ? 'bg-white text-indigo-700 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    ]"
+                  >
+                    日別
+                  </button>
+                  <span class="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">日別表示</span>
+                </div>
+                <div class="group relative">
+                  <button
+                    @click="chartPeriod = 'weekly'"
+                    :class="[
+                      'rounded-md px-3 py-1 text-xs font-medium transition-all',
+                      chartPeriod === 'weekly'
+                        ? 'bg-white text-indigo-700 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    ]"
+                  >
+                    週次
+                  </button>
+                  <span class="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">週次表示</span>
+                </div>
+                <div class="group relative">
+                  <button
+                    @click="chartPeriod = 'monthly'"
+                    :class="[
+                      'rounded-md px-3 py-1 text-xs font-medium transition-all',
+                      chartPeriod === 'monthly'
+                        ? 'bg-white text-indigo-700 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    ]"
+                  >
+                    月次
+                  </button>
+                  <span class="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">月次表示</span>
+                </div>
+              </div>
+              <!-- グラフタイプ切り替え -->
+              <div class="flex gap-1 rounded-lg bg-gray-100 p-1">
+                <div class="group relative">
+                  <button
+                    @click="chartType = 'bar'"
+                    :class="[
+                      'rounded-md px-2 py-1 text-xs font-medium transition-all',
+                      chartType === 'bar'
+                        ? 'bg-white text-indigo-700 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    ]"
+                  >
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                  </button>
+                  <span class="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">時系列</span>
+                </div>
+                <div class="group relative">
+                  <button
+                    @click="chartType = 'pie'"
+                    :class="[
+                      'rounded-md px-2 py-1 text-xs font-medium transition-all',
+                      chartType === 'pie'
+                        ? 'bg-white text-indigo-700 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    ]"
+                  >
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
+                    </svg>
+                  </button>
+                  <span class="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">割合別</span>
+                </div>
+              </div>
             </div>
           </div>
-          <BarChart
-            :key="chartPeriod"
-            :labels="currentLabels"
-            :datasets="currentDatasets"
-            :show-legend="true"
-            :stacked="chartPeriod === 'monthly'"
-          />
+          <!-- 棒グラフ -->
+          <div class="min-h-[250px] lg:min-h-0 lg:flex-1">
+            <BarChart
+              v-if="chartType === 'bar'"
+              :key="chartPeriod"
+              :labels="currentLabels"
+              :datasets="currentDatasets"
+              :show-legend="true"
+              :stacked="chartPeriod === 'monthly'"
+            />
+            <!-- 円グラフ（カテゴリ別） -->
+            <div v-else class="flex h-full flex-col items-center justify-center">
+              <p class="mb-2 text-sm text-gray-500">カテゴリ別支出内訳</p>
+              <PieChart
+                :labels="categoryPieData.labels"
+                :data="categoryPieData.data"
+                :show-legend="true"
+              />
+            </div>
+          </div>
         </div>
 
         <!-- Table Section -->
         <div
-          class="animate-slide-up rounded-2xl border border-white/50 bg-white/80 p-6 shadow-lg backdrop-blur-sm transition-shadow hover:shadow-xl"
+          class="animate-slide-up flex flex-col rounded-2xl border border-white/50 bg-white/80 p-4 shadow-lg backdrop-blur-sm transition-shadow hover:shadow-xl lg:min-h-0"
           :style="{ animationDelay: '500ms' }"
         >
-          <div class="mb-4 flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-gray-800">支出一覧</h2>
+          <div class="mb-2 flex flex-shrink-0 items-center justify-between">
+            <h2 class="text-base font-semibold text-gray-800">支出一覧</h2>
             <span v-if="itemsStore.isLoading" class="text-xs text-gray-500">読み込み中...</span>
           </div>
-          <div class="mb-4 flex gap-1 rounded-lg bg-gray-100 p-1">
+          <div class="mb-2 flex flex-shrink-0 gap-1 rounded-lg bg-gray-100 p-1">
             <button
               @click="tableTab = 'variable'"
               :class="[
@@ -454,19 +536,21 @@ const handleSubmit = async () => {
               固定費
             </button>
           </div>
-          <DataTable
-            v-if="tableTab === 'variable'"
-            ref="dataTableRef"
-            :columns="variableTableColumns"
-            :rows="variableTableRows"
-            empty-message="登録された変動費はありません"
-          />
-          <DataTable
-            v-else
-            :columns="fixedTableColumns"
-            :rows="fixedTableRows"
-            empty-message="登録された固定費はありません"
-          />
+          <div class="min-h-[350px] flex-1 lg:min-h-0">
+            <DataTable
+              v-if="tableTab === 'variable'"
+              ref="dataTableRef"
+              :columns="variableTableColumns"
+              :rows="variableTableRows"
+              empty-message="登録された変動費はありません"
+            />
+            <DataTable
+              v-else
+              :columns="fixedTableColumns"
+              :rows="fixedTableRows"
+              empty-message="登録された固定費はありません"
+            />
+          </div>
         </div>
       </div>
     </main>
@@ -474,9 +558,9 @@ const handleSubmit = async () => {
     <!-- FAB (Floating Action Button) -->
     <button
       @click="openSlideOver"
-      class="fab-button fixed bottom-8 right-8 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg transition-all hover:scale-110 hover:shadow-xl active:scale-95"
+      class="fab-button fixed bottom-6 right-6 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg transition-all hover:scale-110 hover:shadow-xl active:scale-95"
     >
-      <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
       </svg>
     </button>
