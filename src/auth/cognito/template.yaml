@@ -51,7 +51,7 @@ Resources:
   UserPoolDomain:
     Type: AWS::Cognito::UserPoolDomain
     Properties:
-      Domain: !Sub ${Environment}-${AWS::AccountId}
+      Domain: !Sub ai-kakeibo-${Environment}
       UserPoolId: !Ref UserPool
 
   GoogleIdentityProvider:
@@ -110,10 +110,10 @@ Outputs:
 
   CognitoDomain:
     Description: Cognito Hosted UI Domain
-    Value: !Sub ${Environment}-${AWS::AccountId}.auth.${AWS::Region}.amazoncognito.com
+    Value: !Sub ai-kakeibo-${Environment}.auth.${AWS::Region}.amazoncognito.com
     Export:
       Name: !Sub ${AWS::StackName}-CognitoDomain
 
   GoogleIdpResponseUrl:
     Description: URL to set in Google Cloud Console as redirect URI
-    Value: !Sub https://${Environment}-${AWS::AccountId}.auth.${AWS::Region}.amazoncognito.com/oauth2/idpresponse
+    Value: !Sub https://ai-kakeibo-${Environment}.auth.${AWS::Region}.amazoncognito.com/oauth2/idpresponse
