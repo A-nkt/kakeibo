@@ -3,6 +3,7 @@ import DashboardView from '@/views/DashboardView.vue'
 import LoginView from '@/views/LoginView.vue'
 import AuthCallbackView from '@/views/AuthCallbackView.vue'
 import SettingsView from '@/views/SettingsView.vue'
+import LandingPageView from '@/views/landing/LandingPageView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -11,8 +12,14 @@ const router = createRouter({
       path: '/',
       redirect: () => {
         const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true'
-        return isLoggedIn ? '/dashboard' : '/login'
+        return isLoggedIn ? '/dashboard' : '/lp'
       },
+    },
+    {
+      path: '/lp',
+      name: 'landing',
+      component: LandingPageView,
+      // 認証不要、ログイン済みでもLPを表示
     },
     {
       path: '/login',
