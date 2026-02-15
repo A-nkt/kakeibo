@@ -13,13 +13,16 @@ The project is a monorepo with two main components:
 ### Frontend (`src/site/`)
 
 - **Framework**: Vue 3 (Composition API + `<script setup>`) + TypeScript + Vite
+- **Node.js**: Requires `^20.19.0 || >=22.12.0`
 - **State management**: Pinia (setup store pattern with `defineStore(() => {...})`)
+  - Stores: `budget.ts`, `categories.ts`, `items.ts`, `counter.ts`
 - **Styling**: Tailwind CSS v4 + PostCSS
 - **Routing**: Vue Router with localStorage-based auth guards
 - **Auth**: Amazon Cognito with Google OAuth (Hosted UI flow via authorization code)
 - **Charts**: Chart.js via vue-chartjs
 - **Path alias**: `@` maps to `src/site/src/`
 - **Dev server port**: 3000
+- **Base path**: `/` for local dev, `/kakeibo/` for GitHub Pages (auto-detected via `GITHUB_ACTIONS` env var)
 
 ### Backend (`src/api/site/`)
 
@@ -54,13 +57,13 @@ cd src/site && npm ci
 # Development server (http://localhost:3000)
 npm run dev
 
-# Build (runs type-check + vite build)
+# Build (runs type-check + vite build in parallel)
 npm run build
 
-# Lint (oxlint then eslint, both with --fix)
+# Lint (runs oxlint, then eslint sequentially, both with --fix)
 npm run lint
 
-# Format
+# Format (Prettier with experimental CLI)
 npm run format
 
 # Type check only
@@ -83,15 +86,26 @@ Backend deployment (requires AWS credentials):
 
 All routes are defined in `src/api/site/src/app/lambda_function.py` and served through a single Lambda. Base path: `/api/v1/`
 
+### Items
 - `POST /item/regist` — register expense item
 - `GET /item/list?customer_id=` — list items
-- `POST|GET|PUT|DELETE /category/...` — CRUD for categories
+- `PUT /item/update` — update item
+- `DELETE /item/delete` — delete item
+
+### Categories
+- `POST /category/regist` — register category
+- `GET /category/list?customer_id=` — list categories
+- `PUT /category/update` — update category
+- `DELETE /category/delete` — delete category
+
+### Customer
 - `POST /customer/budget/regist` — set budget
 - `GET /customer/budget?customer_id=` — get budget
 
 ## Key Conventions
 
 - Frontend env vars use `VITE_` prefix (see `src/site/.env.example`)
+  - Required: `VITE_COGNITO_USER_POOL_ID`, `VITE_COGNITO_CLIENT_ID`, `VITE_COGNITO_DOMAIN`, `VITE_COGNITO_REDIRECT_URI`, `VITE_API_BASE_URL`
 - `customer_id` is used as the partition key across all DynamoDB tables; derived from the authenticated user's email stored in localStorage
 - SAM stack naming convention: `{env}-app-{category}-{app}-{region}`
 - DynamoDB table naming: `{env}-app-{tablename}-table`
