@@ -43,7 +43,7 @@ const chartData = computed(() => ({
 
 const chartOptions = computed(() => ({
   responsive: true,
-  maintainAspectRatio: true,
+  maintainAspectRatio: false,
   animation: {
     duration: 800,
     easing: 'easeOutQuart' as const
@@ -96,7 +96,7 @@ const chartOptions = computed(() => ({
 </script>
 
 <template>
-  <div class="w-full">
+  <div class="h-full w-full">
     <Bar ref="chartRef" :data="chartData" :options="chartOptions" />
   </div>
 </template>
