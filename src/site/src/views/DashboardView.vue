@@ -536,7 +536,7 @@ const handleSubmit = async () => {
               固定費
             </button>
           </div>
-          <div class="min-h-[350px] flex-1 lg:min-h-0">
+          <div class="h-[350px] lg:h-auto lg:min-h-0 lg:flex-1">
             <DataTable
               v-if="tableTab === 'variable'"
               ref="dataTableRef"
