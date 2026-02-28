@@ -6,10 +6,12 @@ interface Props {
   columns: TableColumn[]
   rows: TableRow[]
   emptyMessage?: string
+  searchQuery?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  emptyMessage: 'データがありません'
+  emptyMessage: 'データがありません',
+  searchQuery: '',
 })
 
 const sortKey = ref<string | null>(null)
@@ -27,6 +29,19 @@ const sortedRows = computed(() => {
       ? String(aVal).localeCompare(String(bVal))
       : String(bVal).localeCompare(String(aVal))
   })
+})
+
+const filteredRows = computed(() => {
+  const query = props.searchQuery.trim().toLowerCase()
+  if (!query) return sortedRows.value
+  return sortedRows.value.filter(row =>
+    props.columns.some(col => {
+      const val = row[col.key]
+      if (val == null) return false
+      if (typeof val === 'number') return val.toLocaleString().includes(query)
+      return String(val).toLowerCase().includes(query)
+    })
+  )
 })
 
 const handleSort = (key: string) => {
@@ -104,7 +119,7 @@ defineExpose({ scrollToBottom })
         </thead>
         <tbody class="divide-y divide-gray-100">
           <tr
-            v-for="(row, rowIndex) in sortedRows"
+            v-for="(row, rowIndex) in filteredRows"
             :key="rowIndex"
             class="group transition-all duration-200 hover:bg-gradient-to-r hover:from-indigo-50/50 hover:to-purple-50/50"
             :style="{ animationDelay: `${rowIndex * 50}ms` }"
@@ -127,13 +142,13 @@ defineExpose({ scrollToBottom })
               <span v-else>{{ formatNumber(row[column.key]) }}</span>
             </td>
           </tr>
-          <tr v-if="rows.length === 0">
+          <tr v-if="filteredRows.length === 0">
             <td :colspan="columns.length" class="px-6 py-12 text-center">
               <div class="flex flex-col items-center gap-2 text-gray-400">
                 <svg class="h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                 </svg>
-                <span class="text-sm">{{ emptyMessage }}</span>
+                <span class="text-sm">{{ props.searchQuery ? '一致する項目がありません' : emptyMessage }}</span>
               </div>
             </td>
           </tr>
