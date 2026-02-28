@@ -33,13 +33,14 @@ const memo = ref('')
 const products = computed(() => categoriesStore.categories)
 
 const tableTab = ref<'variable' | 'fixed'>('variable')
+const tableSearchQuery = ref('')
 
 // テーブル用のカラム定義
 const variableTableColumns = [
+  { key: 'created_date', label: '登録日', width: '120px' },
   { key: 'item_name', label: 'カテゴリ', width: '150px' },
   { key: 'price', label: '金額', width: '120px' },
   { key: 'memo', label: 'メモ', width: '150px' },
-  { key: 'created_date', label: '登録日', width: '120px' },
 ]
 
 const fixedTableColumns = [
@@ -195,6 +196,29 @@ const chartData = computed(() => {
     const key = getDateKey(item.created, period)
     grouped[key] = (grouped[key] || 0) + item.price
   })
+
+  if (period === 'daily') {
+    // 日別: 対象月の1日〜末日まで全日分を表示
+    const now = new Date()
+    const year = now.getFullYear()
+    const month = now.getMonth()
+    const daysInMonth = new Date(year, month + 1, 0).getDate()
+    const allDays: string[] = []
+    for (let d = 1; d <= daysInMonth; d++) {
+      allDays.push(`${pad(month + 1)}/${pad(d)}`)
+    }
+
+    return {
+      labels: allDays,
+      datasets: [{
+        label: '支出',
+        data: allDays.map(key => grouped[key] || 0),
+        backgroundColor: 'rgba(99, 102, 241, 0.8)',
+        borderColor: 'rgb(99, 102, 241)',
+        borderWidth: 1,
+      }],
+    }
+  }
 
   const sortedKeys = Object.keys(grouped).sort((a, b) => a.localeCompare(b)).slice(-10)
 
@@ -512,6 +536,26 @@ const handleSubmit = async () => {
             <h2 class="text-base font-semibold text-gray-800">支出一覧</h2>
             <span v-if="itemsStore.isLoading" class="text-xs text-gray-500">読み込み中...</span>
           </div>
+          <div class="relative mb-2 flex-shrink-0">
+            <svg class="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              v-model="tableSearchQuery"
+              type="text"
+              placeholder="検索..."
+              class="w-full rounded-lg bg-gray-100 py-1.5 pl-8 pr-8 text-sm text-gray-700 placeholder-gray-400 outline-none transition-colors focus:bg-white focus:ring-1 focus:ring-indigo-300"
+            />
+            <button
+              v-if="tableSearchQuery"
+              @click="tableSearchQuery = ''"
+              class="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
           <div class="mb-2 flex flex-shrink-0 gap-1 rounded-lg bg-gray-100 p-1">
             <button
               @click="tableTab = 'variable'"
@@ -536,18 +580,20 @@ const handleSubmit = async () => {
               固定費
             </button>
           </div>
-          <div class="min-h-[350px] flex-1 lg:min-h-0">
+          <div class="h-[350px] lg:h-auto lg:min-h-0 lg:flex-1">
             <DataTable
               v-if="tableTab === 'variable'"
               ref="dataTableRef"
               :columns="variableTableColumns"
               :rows="variableTableRows"
+              :search-query="tableSearchQuery"
               empty-message="登録された変動費はありません"
             />
             <DataTable
               v-else
               :columns="fixedTableColumns"
               :rows="fixedTableRows"
+              :search-query="tableSearchQuery"
               empty-message="登録された固定費はありません"
             />
           </div>
