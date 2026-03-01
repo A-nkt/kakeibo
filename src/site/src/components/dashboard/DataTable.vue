@@ -91,7 +91,7 @@ defineExpose({ scrollToBottom })
 
 <template>
   <div class="flex h-full flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-lg">
-    <div ref="scrollContainer" class="flex-1 overflow-auto">
+    <div ref="scrollContainer" class="flex-1 overflow-auto" style="scrollbar-gutter: stable">
       <table class="min-w-full">
         <thead class="sticky top-0 z-10">
           <tr class="bg-gradient-to-r from-gray-50 to-gray-100">

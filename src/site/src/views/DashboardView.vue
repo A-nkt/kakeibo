@@ -35,6 +35,36 @@ const products = computed(() => categoriesStore.categories)
 const tableTab = ref<'variable' | 'fixed'>('variable')
 const tableSearchQuery = ref('')
 
+// 月セレクター
+const now = new Date()
+const selectedMonth = ref(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`)
+
+const selectedMonthRange = computed(() => {
+  const parts = selectedMonth.value.split('-')
+  const year = Number(parts[0])
+  const month = Number(parts[1])
+  const start = new Date(year, month - 1, 1).getTime() / 1000
+  const end = new Date(year, month, 1).getTime() / 1000
+  return { start, end }
+})
+
+const selectedMonthLabel = computed(() => {
+  const parts = selectedMonth.value.split('-')
+  return `${parts[0]}年${Number(parts[1])}月`
+})
+
+const changeMonth = (delta: number) => {
+  const parts = selectedMonth.value.split('-')
+  const d = new Date(Number(parts[0]), Number(parts[1]) - 1 + delta, 1)
+  selectedMonth.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+// 選択月でフィルタされたアイテム
+const filteredItems = computed(() => {
+  const { start, end } = selectedMonthRange.value
+  return itemsStore.items.filter(item => item.created >= start && item.created < end)
+})
+
 // テーブル用のカラム定義
 const variableTableColumns = [
   { key: 'created_date', label: '登録日', width: '120px' },
@@ -48,9 +78,9 @@ const fixedTableColumns = [
   { key: 'price', label: '金額', width: '120px' },
 ]
 
-// 変動費テーブル
+// 変動費テーブル（月別フィルタ適用）
 const variableTableRows = computed(() => {
-  return [...itemsStore.items]
+  return [...filteredItems.value]
     .filter(item => item.is_fixed !== true)
     .sort((a, b) => a.created - b.created)
     .map(item => {
@@ -189,8 +219,8 @@ const chartData = computed(() => {
     }
   }
 
-  // 日次・週次: 固定費を除外
-  const variableItems = items.filter(item => item.is_fixed !== true)
+  // 日次・週次: 選択月のデータのみ、固定費を除外
+  const variableItems = filteredItems.value.filter(item => item.is_fixed !== true)
   const grouped: Record<string, number> = {}
   variableItems.forEach(item => {
     const key = getDateKey(item.created, period)
@@ -198,10 +228,10 @@ const chartData = computed(() => {
   })
 
   if (period === 'daily') {
-    // 日別: 対象月の1日〜末日まで全日分を表示
-    const now = new Date()
-    const year = now.getFullYear()
-    const month = now.getMonth()
+    // 日別: 選択月の1日〜末日まで全日分を表示
+    const parts = selectedMonth.value.split('-')
+    const year = Number(parts[0])
+    const month = Number(parts[1]) - 1
     const daysInMonth = new Date(year, month + 1, 0).getDate()
     const allDays: string[] = []
     for (let d = 1; d <= daysInMonth; d++) {
@@ -237,9 +267,9 @@ const chartData = computed(() => {
 const currentLabels = computed(() => chartData.value.labels)
 const currentDatasets = computed(() => chartData.value.datasets)
 
-// カテゴリ別円グラフ用のデータ
+// カテゴリ別円グラフ用のデータ（月別フィルタ適用）
 const categoryPieData = computed(() => {
-  const items = itemsStore.items.filter(item => item.is_fixed !== true)
+  const items = filteredItems.value.filter(item => item.is_fixed !== true)
   const categoryTotals: Record<string, number> = {}
   
   items.forEach(item => {
@@ -412,6 +442,27 @@ const handleSubmit = async () => {
         />
       </div>
 
+      <!-- 月セレクター -->
+      <div class="mb-4 flex flex-shrink-0 items-center justify-center gap-2">
+        <button
+          @click="changeMonth(-1)"
+          class="rounded-lg bg-white/80 p-1.5 text-gray-600 shadow-sm transition-all hover:bg-white hover:text-indigo-600 hover:shadow-md"
+        >
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <span class="min-w-[120px] text-center text-sm font-semibold text-gray-700">{{ selectedMonthLabel }}</span>
+        <button
+          @click="changeMonth(1)"
+          class="rounded-lg bg-white/80 p-1.5 text-gray-600 shadow-sm transition-all hover:bg-white hover:text-indigo-600 hover:shadow-md"
+        >
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
+
       <!-- Main Content Grid -->
       <div class="grid grid-cols-1 gap-4 lg:min-h-0 lg:max-h-[60vh] lg:flex-1 lg:grid-cols-2">
         <!-- Chart Section -->
@@ -509,7 +560,7 @@ const handleSubmit = async () => {
           <div class="min-h-[250px] lg:min-h-0 lg:flex-1">
             <BarChart
               v-if="chartType === 'bar'"
-              :key="chartPeriod"
+              :key="`${chartPeriod}-${selectedMonth}`"
               :labels="currentLabels"
               :datasets="currentDatasets"
               :show-legend="true"
