@@ -108,30 +108,35 @@ const fixedTableRows = computed(() => {
 const stats = computed(() => {
   const items = itemsStore.items
 
-  // 今月のデータ
+  // 固定費の合計
+  const fixedTotal = items
+    .filter(item => item.is_fixed === true)
+    .reduce((sum, item) => sum + item.price, 0)
+
+  // 今月の変動費データ（固定費を除外）
   const now = new Date()
   const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime() / 1000
-  const thisMonthItems = items.filter(item => item.created >= thisMonthStart)
-  const thisMonthTotal = thisMonthItems.reduce((sum, item) => sum + item.price, 0)
+  const thisMonthVariableItems = items.filter(item => item.created >= thisMonthStart && item.is_fixed !== true)
+  const thisMonthTotal = thisMonthVariableItems.reduce((sum, item) => sum + item.price, 0)
 
   // 今月の残り日数
   const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
   const remainingDays = lastDayOfMonth - now.getDate() + 1 // 今日を含む
 
-  // 予算と残り
+  // 予算と残り（固定費を差し引いた上で変動費を引く）
   const budget = budgetStore.budget || 0
-  const remaining = budget - thisMonthTotal
+  const remaining = budget - fixedTotal - thisMonthTotal
   const dailyBudget = remainingDays > 0 ? Math.floor(remaining / remainingDays) : 0
 
-  // 先月のデータ（比較用）
+  // 先月の変動費データ（比較用、固定費を除外）
   const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime() / 1000
   const lastMonthEnd = thisMonthStart
-  const lastMonthItems = items.filter(item => item.created >= lastMonthStart && item.created < lastMonthEnd)
-  const lastMonthTotal = lastMonthItems.reduce((sum, item) => sum + item.price, 0)
+  const lastMonthVariableItems = items.filter(item => item.created >= lastMonthStart && item.created < lastMonthEnd && item.is_fixed !== true)
+  const lastMonthTotal = lastMonthVariableItems.reduce((sum, item) => sum + item.price, 0)
 
-  // 前月比
-  const monthlyChange = lastMonthTotal > 0 
-    ? Math.round((thisMonthTotal - lastMonthTotal) / lastMonthTotal * 100) 
+  // 前月比（変動費のみで比較）
+  const monthlyChange = lastMonthTotal > 0
+    ? Math.round((thisMonthTotal - lastMonthTotal) / lastMonthTotal * 100)
     : 0
 
   return [
@@ -146,9 +151,9 @@ const stats = computed(() => {
     {
       title: '今月の支出',
       value: `¥${thisMonthTotal.toLocaleString()}`,
-      subtitle: budget > 0 ? `予算 ¥${budget.toLocaleString()}` : '',
+      subtitle: '',
       icon: '📅',
-      trend: monthlyChange,
+      trend: 0,
       color: 'green' as const
     },
     {
