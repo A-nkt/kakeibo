@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, toRef, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useItemsStore } from '@/stores/items'
@@ -9,12 +9,20 @@ import DataTable from '@/components/dashboard/DataTable.vue'
 import BarChart from '@/components/dashboard/BarChart.vue'
 import PieChart from '@/components/dashboard/PieChart.vue'
 import StatCard from '@/components/dashboard/StatCard.vue'
+import AiComment from '@/components/dashboard/AiComment.vue'
+import { useExpenseAnalysis } from '@/composables/useExpenseAnalysis'
 
 const router = useRouter()
 const { currentUser, logout } = useAuth()
 const itemsStore = useItemsStore()
 const categoriesStore = useCategoriesStore()
 const budgetStore = useBudgetStore()
+
+const { comments: aiComments } = useExpenseAnalysis(
+  toRef(itemsStore, 'items'),
+  toRef(categoriesStore, 'categories'),
+  toRef(budgetStore, 'budget'),
+)
 
 const isLoaded = ref(false)
 const chartPeriod = ref<'daily' | 'weekly' | 'monthly'>('daily')
@@ -187,45 +195,10 @@ const chartData = computed(() => {
   const items = itemsStore.items
   const period = chartPeriod.value
 
-  if (period === 'monthly') {
-    // 月次: 固定費/変動費を分離して2データセット
-    const fixedGrouped: Record<string, number> = {}
-    const variableGrouped: Record<string, number> = {}
-    items.forEach(item => {
-      const key = getDateKey(item.created, period)
-      if (item.is_fixed === true) {
-        fixedGrouped[key] = (fixedGrouped[key] || 0) + item.price
-      } else {
-        variableGrouped[key] = (variableGrouped[key] || 0) + item.price
-      }
-    })
-
-    const allKeys = new Set([...Object.keys(fixedGrouped), ...Object.keys(variableGrouped)])
-    const sortedKeys = [...allKeys].sort((a, b) => a.localeCompare(b)).slice(-10)
-
-    return {
-      labels: sortedKeys,
-      datasets: [
-        {
-          label: '固定費',
-          data: sortedKeys.map(key => fixedGrouped[key] || 0),
-          backgroundColor: 'rgba(239, 68, 68, 0.8)',
-          borderColor: 'rgb(239, 68, 68)',
-          borderWidth: 1,
-        },
-        {
-          label: '変動費',
-          data: sortedKeys.map(key => variableGrouped[key] || 0),
-          backgroundColor: 'rgba(99, 102, 241, 0.8)',
-          borderColor: 'rgb(99, 102, 241)',
-          borderWidth: 1,
-        },
-      ],
-    }
-  }
-
-  // 日次・週次: 選択月のデータのみ、固定費を除外
-  const variableItems = filteredItems.value.filter(item => item.is_fixed !== true)
+  // 固定費を除外し、変動費のみ表示
+  const variableItems = period === 'monthly'
+    ? items.filter(item => item.is_fixed !== true)
+    : filteredItems.value.filter(item => item.is_fixed !== true)
   const grouped: Record<string, number> = {}
   variableItems.forEach(item => {
     const key = getDateKey(item.created, period)
@@ -468,6 +441,9 @@ const handleSubmit = async () => {
         </button>
       </div>
 
+      <!-- AIアドバイス -->
+      <AiComment :comments="aiComments" class="mb-4 animate-slide-up" :style="{ animationDelay: '300ms' }" />
+
       <!-- Main Content Grid -->
       <div class="grid grid-cols-1 gap-4 lg:min-h-0 lg:max-h-[60vh] lg:flex-1 lg:grid-cols-2">
         <!-- Chart Section -->
@@ -569,7 +545,7 @@ const handleSubmit = async () => {
               :labels="currentLabels"
               :datasets="currentDatasets"
               :show-legend="true"
-              :stacked="chartPeriod === 'monthly'"
+              :stacked="false"
             />
             <!-- 円グラフ（カテゴリ別） -->
             <div v-else class="flex h-full flex-col items-center justify-center">
