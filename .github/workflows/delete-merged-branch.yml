@@ -18,7 +18,7 @@ jobs:
             const repo = context.repo.repo
             
             // mainやdevelopブランチは削除しない
-            const protectedBranches = ['main', 'develop']
+            const protectedBranches = ['main']
             if (protectedBranches.includes(branch)) {
               console.log(`Skipping protected branch: ${branch}`)
               return
