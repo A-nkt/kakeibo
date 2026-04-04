@@ -54,6 +54,8 @@ const fixedItems = computed(() =>
 
 // 支出管理
 const isEditItemModalOpen = ref(false)
+const isDeleteItemModalOpen = ref(false)
+const deletingItem = ref<{ item_id: string; name: string } | null>(null)
 const editingItem = ref<{
   item_id: string
   categoryId: string
@@ -203,6 +205,27 @@ const handleEditItemSave = async () => {
     closeEditItemModal()
   } catch (e) {
     alert(e instanceof Error ? e.message : '更新に失敗しました')
+  }
+}
+
+const openDeleteItemModal = (row: { item_id: string; item_name: string }) => {
+  deletingItem.value = { item_id: row.item_id, name: row.item_name }
+  isDeleteItemModalOpen.value = true
+}
+
+const closeDeleteItemModal = () => {
+  isDeleteItemModalOpen.value = false
+  deletingItem.value = null
+}
+
+const handleDeleteItem = async () => {
+  if (!deletingItem.value || !customerId.value) return
+
+  try {
+    await itemsStore.removeItem(customerId.value, deletingItem.value.item_id)
+    closeDeleteItemModal()
+  } catch (e) {
+    alert(e instanceof Error ? e.message : '削除に失敗しました')
   }
 }
 
@@ -449,14 +472,24 @@ const goBack = () => {
                     <td class="hidden max-w-[150px] truncate px-6 py-3 text-sm text-gray-500 sm:table-cell" :title="row.memo">{{ row.memo }}</td>
                     <td class="hidden whitespace-nowrap px-6 py-3 text-sm text-gray-700 sm:table-cell">{{ row.created_date }}</td>
                     <td class="whitespace-nowrap px-4 py-3 text-sm sm:px-6">
-                      <button
-                        @click="openEditItemModal(row)"
-                        class="rounded-lg p-1.5 text-gray-400 transition-all hover:bg-indigo-100 hover:text-indigo-600"
-                      >
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                      </button>
+                      <div class="flex items-center justify-end gap-1">
+                        <button
+                          @click="openEditItemModal(row)"
+                          class="rounded-lg p-1.5 text-gray-400 transition-all hover:bg-indigo-100 hover:text-indigo-600"
+                        >
+                          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                        <button
+                          @click="openDeleteItemModal(row)"
+                          class="rounded-lg p-1.5 text-gray-400 transition-all hover:bg-red-100 hover:text-red-600"
+                        >
+                          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                   <tr v-if="variableItemRows.length === 0">
@@ -731,6 +764,46 @@ const goBack = () => {
               class="flex-1 rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white transition-all hover:bg-red-700 disabled:opacity-50"
             >
               {{ categoriesStore.isLoading ? '削除中...' : '削除する' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- Delete Item Modal -->
+    <Transition name="modal">
+      <div v-if="isDeleteItemModalOpen && deletingItem" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" @click="closeDeleteItemModal"></div>
+        <div class="relative w-full max-w-md transform rounded-3xl bg-white p-6 shadow-2xl transition-all">
+          <div class="mb-6 flex items-center gap-3">
+            <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-red-100 text-red-600">
+              <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-xl font-bold text-gray-800">支出を削除</h3>
+              <p class="text-sm text-gray-500">この操作は取り消せません</p>
+            </div>
+          </div>
+          <div class="mb-6 rounded-xl bg-red-50 p-4">
+            <p class="text-gray-700">
+              「<span class="font-bold text-red-600">{{ deletingItem.name }}</span>」を削除しますか？
+            </p>
+          </div>
+          <div class="flex gap-3">
+            <button
+              @click="closeDeleteItemModal"
+              class="flex-1 rounded-xl border-2 border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-600 transition-all hover:bg-gray-50"
+            >
+              キャンセル
+            </button>
+            <button
+              @click="handleDeleteItem"
+              :disabled="itemsStore.isLoading"
+              class="flex-1 rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white transition-all hover:bg-red-700 disabled:opacity-50"
+            >
+              {{ itemsStore.isLoading ? '削除中...' : '削除する' }}
             </button>
           </div>
         </div>
