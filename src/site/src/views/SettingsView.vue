@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useItemsStore } from '@/stores/items'
@@ -13,20 +13,6 @@ const categoriesStore = useCategoriesStore()
 const budgetStore = useBudgetStore()
 
 const activeTab = ref<'variable' | 'fixed' | 'categories'>('variable')
-const itemsScrollContainer = ref<HTMLElement | null>(null)
-
-const scrollItemsToBottom = async () => {
-  await nextTick()
-  if (itemsScrollContainer.value) {
-    itemsScrollContainer.value.scrollTop = itemsScrollContainer.value.scrollHeight
-  }
-}
-
-watch(activeTab, (tab) => {
-  if (tab === 'variable') {
-    scrollItemsToBottom()
-  }
-})
 const customerId = computed(() => currentUser.value?.email || localStorage.getItem('userEmail') || '')
 
 // カテゴリ管理
@@ -67,22 +53,152 @@ const editingItem = ref<{
 const categories = computed(() => categoriesStore.categories)
 const products = computed(() => categoriesStore.categories)
 
+// 変動費一覧の絞り込み・並び替え
+const searchQuery = ref('')
+const filterCategoryId = ref<'all' | string>('all')
+const sortKey = ref<'date-desc' | 'date-asc' | 'price-desc' | 'price-asc'>('date-desc')
+// '' のときは最新月を自動選択（activeMonth で解決）
+const selectedMonth = ref<'all' | string>('')
+
+const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土']
+
+// カテゴリバッジの色。円グラフ（PieChart）と同じ順序・同じ系統で揃える
+const CATEGORY_BADGE_CLASSES = [
+  'bg-indigo-100 text-indigo-700',
+  'bg-emerald-100 text-emerald-700',
+  'bg-amber-100 text-amber-700',
+  'bg-red-100 text-red-700',
+  'bg-violet-100 text-violet-700',
+  'bg-cyan-100 text-cyan-700',
+  'bg-pink-100 text-pink-700',
+  'bg-green-100 text-green-700',
+  'bg-orange-100 text-orange-700',
+  'bg-blue-100 text-blue-700',
+]
+
+const categoryMetaMap = computed(
+  () => new Map(products.value.map((p, index) => [p.category_id, { name: p.name, index }])),
+)
+
+const categoryBadgeClass = (categoryId: string) => {
+  const index = categoryMetaMap.value.get(categoryId)?.index ?? 0
+  return CATEGORY_BADGE_CLASSES[index % CATEGORY_BADGE_CLASSES.length]
+}
+
+const formatMonthLabel = (monthKey: string) => {
+  const [year, month] = monthKey.split('-')
+  return `${year}年${Number(month)}月`
+}
+
+const formatDayLabel = (dateKey: string) => {
+  const [year, month, day] = dateKey.split('-').map(Number)
+  const weekday = WEEKDAY_LABELS[new Date(year!, month! - 1, day!).getDay()]
+  return `${month}月${day}日(${weekday})`
+}
+
+// 新しい順の全件。フィルタはここから絞り込む
 const variableItemRows = computed(() => {
   return [...itemsStore.items]
     .filter(item => item.is_fixed !== true)
-    .sort((a, b) => a.created - b.created)
+    .sort((a, b) => b.created - a.created)
     .map(item => {
-      const product = products.value.find(p => p.category_id === item.id)
+      const date = new Date(item.created * 1000)
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
       return {
-        item_name: product?.name || item.id,
+        item_name: categoryMetaMap.value.get(item.id)?.name || item.id,
         price: item.price,
         memo: item.memo || '',
-        created_date: new Date(item.created * 1000).toLocaleDateString('ja-JP'),
+        created_date: date.toLocaleDateString('ja-JP'),
         item_id: item.item_id,
         category_id: item.id,
         created_timestamp: item.created,
+        month_key: monthKey,
+        date_key: `${monthKey}-${String(date.getDate()).padStart(2, '0')}`,
       }
     })
+})
+
+// 新しい月が先頭
+const availableMonths = computed(() => {
+  const keys = new Set(variableItemRows.value.map(row => row.month_key))
+  return [...keys].sort((a, b) => b.localeCompare(a))
+})
+
+// 選択中の月が消えた（全件削除など）場合は最新月にフォールバック
+const activeMonth = computed<'all' | string>(() => {
+  if (selectedMonth.value === 'all') return 'all'
+  if (selectedMonth.value && availableMonths.value.includes(selectedMonth.value)) return selectedMonth.value
+  return availableMonths.value[0] ?? 'all'
+})
+
+const monthIndex = computed(() => availableMonths.value.indexOf(activeMonth.value))
+const hasOlderMonth = computed(() => monthIndex.value >= 0 && monthIndex.value < availableMonths.value.length - 1)
+const hasNewerMonth = computed(() => monthIndex.value > 0)
+
+const goOlderMonth = () => {
+  if (hasOlderMonth.value) selectedMonth.value = availableMonths.value[monthIndex.value + 1]!
+}
+
+const goNewerMonth = () => {
+  if (hasNewerMonth.value) selectedMonth.value = availableMonths.value[monthIndex.value - 1]!
+}
+
+const isFilterActive = computed(
+  () => searchQuery.value.trim() !== '' || filterCategoryId.value !== 'all' || sortKey.value !== 'date-desc',
+)
+
+const clearFilters = () => {
+  searchQuery.value = ''
+  filterCategoryId.value = 'all'
+  sortKey.value = 'date-desc'
+}
+
+const filteredItemRows = computed(() => {
+  const query = searchQuery.value.trim().toLowerCase()
+  // filter() が新しい配列を返すので以降の破壊的な並び替えは安全
+  const rows = variableItemRows.value.filter(row => {
+    if (activeMonth.value !== 'all' && row.month_key !== activeMonth.value) return false
+    if (filterCategoryId.value !== 'all' && row.category_id !== filterCategoryId.value) return false
+    if (query && !`${row.item_name} ${row.memo}`.toLowerCase().includes(query)) return false
+    return true
+  })
+
+  switch (sortKey.value) {
+    case 'date-asc':
+      return rows.reverse()
+    case 'price-desc':
+      return rows.sort((a, b) => b.price - a.price)
+    case 'price-asc':
+      return rows.sort((a, b) => a.price - b.price)
+    default:
+      return rows
+  }
+})
+
+const filteredTotal = computed(() => filteredItemRows.value.reduce((sum, row) => sum + row.price, 0))
+
+const isGroupedByDate = computed(() => sortKey.value === 'date-desc' || sortKey.value === 'date-asc')
+
+// 日付順のときは日ごとにグループ化（見出し＋日計）、金額順のときは 1 グループのフラット表示
+const itemSections = computed(() => {
+  const rows = filteredItemRows.value
+  if (!isGroupedByDate.value) {
+    return [{ key: 'flat', label: '', total: 0, rows }]
+  }
+
+  const groups = new Map<string, typeof rows>()
+  for (const row of rows) {
+    const bucket = groups.get(row.date_key)
+    if (bucket) bucket.push(row)
+    else groups.set(row.date_key, [row])
+  }
+
+  return [...groups].map(([key, groupRows]) => ({
+    key,
+    label: formatDayLabel(key),
+    total: groupRows.reduce((sum, row) => sum + row.price, 0),
+    rows: groupRows,
+  }))
 })
 
 onMounted(async () => {
@@ -93,7 +209,6 @@ onMounted(async () => {
       budgetStore.fetchBudget(customerId.value),
     ])
     budgetInput.value = budgetStore.budget || null
-    scrollItemsToBottom()
   }
 })
 
@@ -445,65 +560,165 @@ const goBack = () => {
       <div class="flex min-h-0 flex-1 flex-col">
         <!-- 変動費タブ -->
         <div v-if="activeTab === 'variable'" class="flex min-h-0 flex-1 flex-col">
-          <div class="mb-3 flex shrink-0 items-center justify-between">
+          <div class="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-2">
             <h2 class="text-base font-semibold text-gray-800">変動費一覧</h2>
-            <span v-if="itemsStore.isLoading" class="text-xs text-gray-500">読み込み中...</span>
+            <div class="flex items-center gap-3 text-xs">
+              <span v-if="itemsStore.isLoading" class="text-gray-500">読み込み中...</span>
+              <span class="text-gray-500">{{ filteredItemRows.length }}件</span>
+              <span class="font-semibold text-gray-700">合計 ¥{{ filteredTotal.toLocaleString() }}</span>
+            </div>
           </div>
+
+          <!-- 絞り込みバー -->
+          <div class="mb-3 shrink-0 flex flex-wrap items-center gap-2 rounded-xl border border-white/50 bg-white/80 px-3 py-2 shadow-sm backdrop-blur-sm sm:px-4">
+            <!-- 月切り替え -->
+            <div class="flex shrink-0 items-center gap-0.5 rounded-lg border border-gray-200 bg-gray-50 p-0.5">
+              <button
+                @click="goOlderMonth"
+                :disabled="!hasOlderMonth"
+                title="前の月"
+                class="rounded-md p-1.5 text-gray-500 transition-all hover:bg-white hover:text-indigo-600 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-500"
+              >
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <select
+                :value="activeMonth"
+                @change="selectedMonth = ($event.target as HTMLSelectElement).value"
+                class="cursor-pointer appearance-none rounded-md bg-transparent px-1 py-1 text-center text-sm font-semibold text-gray-800 focus:outline-none"
+              >
+                <option value="all">全期間</option>
+                <option v-for="month in availableMonths" :key="month" :value="month">
+                  {{ formatMonthLabel(month) }}
+                </option>
+              </select>
+              <button
+                @click="goNewerMonth"
+                :disabled="!hasNewerMonth"
+                title="次の月"
+                class="rounded-md p-1.5 text-gray-500 transition-all hover:bg-white hover:text-indigo-600 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-500"
+              >
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+
+            <!-- 検索 -->
+            <div class="relative min-w-[9rem] flex-1">
+              <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5 text-gray-400">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </span>
+              <input
+                v-model="searchQuery"
+                type="search"
+                placeholder="カテゴリ・メモで検索"
+                class="w-full rounded-lg border border-gray-200 bg-gray-50 py-1.5 pl-8 pr-3 text-sm text-gray-900 transition-all focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              />
+            </div>
+
+            <!-- カテゴリ絞り込み -->
+            <select
+              v-model="filterCategoryId"
+              class="shrink-0 cursor-pointer rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-sm text-gray-700 transition-all focus:border-indigo-500 focus:bg-white focus:outline-none"
+            >
+              <option value="all">全カテゴリ</option>
+              <option v-for="product in products" :key="product.category_id" :value="product.category_id">
+                {{ product.name }}
+              </option>
+            </select>
+
+            <!-- 並び順 -->
+            <select
+              v-model="sortKey"
+              class="shrink-0 cursor-pointer rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-sm text-gray-700 transition-all focus:border-indigo-500 focus:bg-white focus:outline-none"
+            >
+              <option value="date-desc">新しい順</option>
+              <option value="date-asc">古い順</option>
+              <option value="price-desc">高い順</option>
+              <option value="price-asc">安い順</option>
+            </select>
+
+            <button
+              v-if="isFilterActive"
+              @click="clearFilters"
+              class="shrink-0 rounded-lg px-2 py-1.5 text-xs font-medium text-gray-500 transition-all hover:bg-gray-100 hover:text-gray-700"
+            >
+              条件クリア
+            </button>
+          </div>
+
+          <!-- 一覧 -->
           <div class="min-h-0 flex-1 overflow-hidden rounded-2xl border border-white/50 bg-white/80 shadow-lg backdrop-blur-sm">
-            <div ref="itemsScrollContainer" class="h-full overflow-auto">
-              <table class="min-w-full">
-                <thead class="sticky top-0 z-10">
-                  <tr class="bg-gradient-to-r from-gray-50 to-gray-100">
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 sm:px-6">カテゴリ</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 sm:px-6" style="width: 120px">金額</th>
-                    <th class="hidden px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 sm:table-cell" style="width: 150px">メモ</th>
-                    <th class="hidden px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 sm:table-cell" style="width: 120px">登録日</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 sm:px-6" style="width: 60px"></th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-100">
-                  <tr
-                    v-for="row in variableItemRows"
+            <div class="h-full overflow-auto">
+              <div v-if="filteredItemRows.length === 0" class="px-6 py-12 text-center">
+                <div class="flex flex-col items-center gap-2 text-gray-400">
+                  <svg class="h-10 w-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                  </svg>
+                  <span class="text-sm">
+                    {{ variableItemRows.length === 0 ? '登録された変動費はありません' : '条件に一致する変動費はありません' }}
+                  </span>
+                </div>
+              </div>
+
+              <div v-for="section in itemSections" :key="section.key">
+                <!-- 日付ごとの見出し（スクロール時は上部に固定） -->
+                <div
+                  v-if="isGroupedByDate"
+                  class="sticky top-0 z-10 flex items-center justify-between border-y border-slate-200/80 bg-slate-100 px-4 py-1.5 sm:px-6"
+                >
+                  <span class="text-xs font-bold tracking-wide text-slate-600">{{ section.label }}</span>
+                  <span class="text-xs font-semibold tabular-nums text-slate-500">¥{{ section.total.toLocaleString() }}</span>
+                </div>
+                <ul class="divide-y divide-gray-100">
+                  <li
+                    v-for="row in section.rows"
                     :key="row.item_id"
-                    class="group transition-all duration-200 hover:bg-gradient-to-r hover:from-indigo-50/50 hover:to-purple-50/50"
+                    class="flex items-center gap-2 px-4 py-2 transition-colors hover:bg-indigo-50/40 sm:gap-3 sm:px-6"
                   >
-                    <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-700 sm:px-6">{{ row.item_name }}</td>
-                    <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-600 sm:px-6">¥{{ row.price.toLocaleString() }}</td>
-                    <td class="hidden max-w-[150px] truncate px-6 py-3 text-sm text-gray-500 sm:table-cell" :title="row.memo">{{ row.memo }}</td>
-                    <td class="hidden whitespace-nowrap px-6 py-3 text-sm text-gray-700 sm:table-cell">{{ row.created_date }}</td>
-                    <td class="whitespace-nowrap px-4 py-3 text-sm sm:px-6">
-                      <div class="flex items-center justify-end gap-1">
-                        <button
-                          @click="openEditItemModal(row)"
-                          class="rounded-lg p-1.5 text-gray-400 transition-all hover:bg-indigo-100 hover:text-indigo-600"
-                        >
-                          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                        </button>
-                        <button
-                          @click="openDeleteItemModal(row)"
-                          class="rounded-lg p-1.5 text-gray-400 transition-all hover:bg-red-100 hover:text-red-600"
-                        >
-                          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr v-if="variableItemRows.length === 0">
-                    <td colspan="5" class="px-6 py-12 text-center">
-                      <div class="flex flex-col items-center gap-2 text-gray-400">
-                        <svg class="h-10 w-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                    <span
+                      :class="[
+                        'min-w-16 max-w-32 shrink-0 truncate rounded-md px-2 py-0.5 text-center text-xs font-semibold',
+                        categoryBadgeClass(row.category_id),
+                      ]"
+                      :title="row.item_name"
+                    >
+                      {{ row.item_name }}
+                    </span>
+                    <span v-if="!isGroupedByDate" class="shrink-0 text-xs tabular-nums text-gray-400">
+                      {{ row.created_date }}
+                    </span>
+                    <span class="min-w-0 flex-1 truncate text-xs text-gray-500" :title="row.memo">{{ row.memo }}</span>
+                    <span class="shrink-0 text-sm font-semibold tabular-nums text-gray-800">
+                      ¥{{ row.price.toLocaleString() }}
+                    </span>
+                    <div class="flex shrink-0 items-center gap-0.5">
+                      <button
+                        @click="openEditItemModal(row)"
+                        title="編集"
+                        class="rounded-lg p-1.5 text-gray-400 transition-all hover:bg-indigo-100 hover:text-indigo-600"
+                      >
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
-                        <span class="text-sm">登録された変動費はありません</span>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+                      </button>
+                      <button
+                        @click="openDeleteItemModal(row)"
+                        title="削除"
+                        class="rounded-lg p-1.5 text-gray-400 transition-all hover:bg-red-100 hover:text-red-600"
+                      >
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>

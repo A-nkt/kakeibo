@@ -1,81 +1,11 @@
-<template>
-  <footer
-    ref="footerRef"
-    class="relative overflow-hidden border-t border-white/10 bg-gradient-to-b from-transparent to-indigo-950/50"
-  >
-    <!-- Background Elements -->
-    <div class="absolute inset-0">
-      <!-- Gradient Orbs -->
-      <div class="absolute -left-20 top-0 h-48 w-48 animate-blob rounded-full bg-indigo-500 opacity-10 mix-blend-multiply blur-3xl filter"></div>
-      <div class="animation-delay-2000 absolute -right-20 bottom-0 h-48 w-48 animate-blob rounded-full bg-purple-500 opacity-10 mix-blend-multiply blur-3xl filter"></div>
-
-      <!-- Grid Pattern -->
-      <div class="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:48px_48px]"></div>
-    </div>
-
-    <!-- Content -->
-    <div
-      :class="[
-        'relative z-10 container mx-auto px-4 py-12 transition-all duration-1000',
-        isVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
-      ]"
-    >
-      <div class="flex flex-col items-center gap-8">
-        <!-- Logo & Brand -->
-        <div class="flex items-center gap-3">
-          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600">
-            <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <span class="bg-gradient-to-r from-white to-purple-200 bg-clip-text text-xl font-bold text-transparent">
-            AI家計簿
-          </span>
-        </div>
-
-        <!-- Links -->
-        <nav v-if="displayLinks.length > 0" class="flex flex-wrap items-center justify-center gap-6">
-          <a
-            v-for="link in displayLinks"
-            :key="link.href"
-            :href="link.href"
-            class="relative text-sm text-purple-200 transition-all duration-200 hover:text-white after:absolute after:bottom-0 after:left-0 after:h-px after:w-0 after:bg-white after:transition-all after:duration-300 hover:after:w-full"
-          >
-            {{ link.label }}
-          </a>
-        </nav>
-
-        <!-- Free Badge -->
-        <div class="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 backdrop-blur-sm">
-          <svg class="h-4 w-4 text-emerald-400" fill="currentColor" viewBox="0 0 20 20">
-            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-          </svg>
-          <span class="text-sm text-purple-100">完全無料で利用可能</span>
-        </div>
-
-        <!-- Divider -->
-        <div class="h-px w-full max-w-md bg-gradient-to-r from-transparent via-purple-500/30 to-transparent"></div>
-
-        <!-- Copyright -->
-        <p class="text-center text-sm text-purple-300">
-          © {{ displayCopyrightYear }} AI家計簿. All rights reserved.
-        </p>
-      </div>
-    </div>
-  </footer>
-</template>
-
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useScrollAnimation } from '@/composables/useScrollAnimation'
 
-// Types
 interface FooterLink {
   label: string
   href: string
 }
 
-// Props
 interface Props {
   links?: FooterLink[]
   copyrightYear?: number
@@ -83,38 +13,62 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   links: () => [],
-  copyrightYear: () => new Date().getFullYear()
+  copyrightYear: () => new Date().getFullYear(),
 })
 
-// Computed display values
 const displayLinks = computed(() => props.links)
 const displayCopyrightYear = computed(() => props.copyrightYear)
-
-// Scroll animation
-const { elementRef: footerRef, isVisible } = useScrollAnimation({ threshold: 0.2 })
 </script>
 
-<style scoped>
-@keyframes blob {
-  0%, 100% {
-    transform: translate(0, 0) scale(1);
-  }
-  25% {
-    transform: translate(20px, -30px) scale(1.1);
-  }
-  50% {
-    transform: translate(-20px, 20px) scale(0.9);
-  }
-  75% {
-    transform: translate(30px, 10px) scale(1.05);
-  }
-}
+<template>
+  <footer class="border-t border-ink/10 bg-paper">
+    <div class="mx-auto max-w-6xl px-5 py-14 sm:px-8">
+      <div class="grid gap-10 md:grid-cols-12 md:items-start">
+        <!-- 銘 -->
+        <div class="md:col-span-5">
+          <div class="flex items-center gap-2.5">
+            <span class="flex h-8 w-8 items-center justify-center rounded-md bg-ink font-mincho text-base font-bold text-paper">
+              ¥
+            </span>
+            <span class="font-mincho text-lg font-bold tracking-tight text-ink">AI家計簿</span>
+          </div>
+          <p class="mt-4 max-w-xs font-gothic text-xs leading-[1.9] text-ink-3">
+            AIが支出パターンを分析し、「今日使える金額」を自動計算する家計簿アプリ。すべての機能を完全無料で。
+          </p>
+        </div>
 
-.animate-blob {
-  animation: blob 8s ease-in-out infinite;
-}
+        <!-- リンク -->
+        <nav v-if="displayLinks.length > 0" class="md:col-span-4">
+          <p class="mb-4 font-gothic text-[11px] font-bold tracking-[0.22em] text-ink-3">リンク</p>
+          <ul class="space-y-2.5">
+            <li v-for="link in displayLinks" :key="link.label">
+              <a
+                :href="link.href"
+                class="relative font-gothic text-sm text-ink-2 transition-colors hover:text-ink after:absolute after:-bottom-0.5 after:left-0 after:h-px after:w-0 after:bg-ink after:transition-all after:duration-300 hover:after:w-full"
+              >
+                {{ link.label }}
+              </a>
+            </li>
+          </ul>
+        </nav>
 
-.animation-delay-2000 {
-  animation-delay: 2s;
-}
-</style>
+        <!-- 料金の明示 -->
+        <div class="md:col-span-3">
+          <p class="mb-4 font-gothic text-[11px] font-bold tracking-[0.22em] text-ink-3">料金</p>
+          <p class="flex items-baseline gap-2">
+            <span class="font-mincho text-4xl font-black leading-none tabular-nums text-ink">¥0</span>
+            <span class="font-gothic text-xs text-ink-3">/ 月</span>
+          </p>
+          <p class="mt-3 font-gothic text-xs text-emerald-800">完全無料で利用可能</p>
+        </div>
+      </div>
+
+      <div class="mt-14 flex flex-col gap-3 border-t border-ink/10 pt-6 sm:flex-row sm:items-center sm:justify-between">
+        <p class="font-gothic text-xs text-ink-3">
+          © {{ displayCopyrightYear }} AI家計簿. All rights reserved.
+        </p>
+        <p class="font-gothic text-[10px] tracking-[0.3em] text-ink/25">KAKEIBO</p>
+      </div>
+    </div>
+  </footer>
+</template>

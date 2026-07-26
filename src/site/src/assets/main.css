@@ -1,1 +1,33 @@
 @import "tailwindcss";
+
+/*
+ * LP（/lp）専用のエディトリアル・テーマ。
+ * アプリ本体（ダッシュボード・各種設定）の見た目には影響させないため、
+ * デフォルトの font-sans / color は上書きせず、新しいトークンとして追加する。
+ */
+@theme {
+  --font-mincho: 'Zen Old Mincho', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+  --font-gothic: 'Zen Kaku Gothic New', 'Hiragino Sans', 'Yu Gothic', sans-serif;
+
+  --color-paper: #f6f3ec;
+  --color-paper-2: #efeae0;
+  --color-paper-3: #e5dfd2;
+  --color-ink: #17161b;
+  --color-ink-2: #3a3841;
+  --color-ink-3: #6b6873;
+  --color-vermilion: #b4402f;
+}
+
+/* 罫線・地紋のユーティリティ */
+@utility rule-x {
+  border-color: color-mix(in srgb, var(--color-ink) 12%, transparent);
+}
+
+@utility grain {
+  position: relative;
+}
+
+/* 紙の質感。外部アセットを持たせないため SVG の feTurbulence をインラインで使う */
+@utility grain-overlay {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.42'/%3E%3C/svg%3E");
+}
