@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { Pie } from 'vue-chartjs'
 import {
   Chart as ChartJS,
@@ -51,6 +51,16 @@ const borderColors = [
   'rgb(59, 130, 246)',
 ]
 
+// スマホ幅では右側に凡例を置くと見切れるため、下に回す（Tailwind の sm 未満）
+const narrowQuery = window.matchMedia('(max-width: 639px)')
+const isNarrow = ref(narrowQuery.matches)
+const onNarrowChange = (e: MediaQueryListEvent) => {
+  isNarrow.value = e.matches
+}
+
+onMounted(() => narrowQuery.addEventListener('change', onNarrowChange))
+onUnmounted(() => narrowQuery.removeEventListener('change', onNarrowChange))
+
 const chartData = computed(() => ({
   labels: props.labels,
   datasets: [{
@@ -68,7 +78,7 @@ const chartOptions = computed(() => ({
   plugins: {
     legend: {
       display: props.showLegend,
-      position: 'right' as const,
+      position: isNarrow.value ? 'bottom' as const : 'right' as const,
       labels: {
         usePointStyle: true,
         padding: 12,

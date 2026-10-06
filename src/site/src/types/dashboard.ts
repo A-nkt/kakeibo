@@ -5,6 +5,8 @@ export interface TableColumn {
   key: string
   label: string
   width?: string
+  // スマホ幅（sm 未満）では列ごと非表示にする
+  hideOnMobile?: boolean
 }
 
 // テーブル行データ（ジェネリック対応）

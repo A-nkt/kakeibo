@@ -57,7 +57,7 @@ const displaySteps = computed(() => (props.steps.length > 0 ? props.steps : DEFA
             <span class="font-gothic text-xs font-bold tracking-[0.22em] text-ink-3">かんたん3ステップ</span>
           </div>
           <h2 class="font-mincho text-3xl font-black leading-tight tracking-tight text-ink sm:text-5xl">
-            使い方は、とてもシンプル
+            使い方は、<span class="inline-block">とてもシンプル</span>
           </h2>
         </div>
         <p class="font-gothic text-sm leading-[1.9] text-ink-2 lg:col-span-5 lg:pb-2">

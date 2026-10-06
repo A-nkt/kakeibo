@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import GoogleCta from './GoogleCta.vue'
 import RevealOnScroll from './RevealOnScroll.vue'
 
@@ -13,13 +14,16 @@ interface Props {
   buttonText?: string
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
   variant: 'full',
   message: 'ずっと無料。今すぐ始めよう。',
   buttonText: '無料で始める',
 })
 
 defineEmits<{ (e: 'cta-click'): void }>()
+
+// 大見出しは文単位（「。」区切り）でまとめて折り返し、スマホ幅で1〜2文字だけ次行に落ちるのを防ぐ
+const messageSentences = computed(() => props.message.match(/[^。]+。?/g) ?? [props.message])
 
 const TRUST = ['Googleアカウントで登録', '追加入力不要', 'ワンクリックで開始', 'パスワード管理不要']
 </script>
@@ -59,7 +63,7 @@ const TRUST = ['Googleアカウントで登録', '追加入力不要', 'ワン�
       </div>
 
       <h2 class="font-mincho text-3xl font-black leading-[1.25] tracking-tight sm:text-5xl">
-        {{ message }}
+        <span v-for="sentence in messageSentences" :key="sentence" class="inline-block">{{ sentence }}</span>
       </h2>
 
       <p class="mx-auto mt-7 max-w-lg font-gothic text-sm leading-[1.95] text-paper/65 sm:text-base">

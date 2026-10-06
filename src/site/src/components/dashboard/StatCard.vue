@@ -42,7 +42,7 @@ const iconBgClasses = {
     <div class="relative flex items-start justify-between">
       <div>
         <p class="text-sm font-medium text-white/80">{{ title }}</p>
-        <p class="mt-2 text-3xl font-bold tracking-tight">{{ value }}</p>
+        <p class="mt-2 text-3xl font-bold tracking-tight md:text-2xl lg:text-3xl">{{ value }}</p>
         <p v-if="subtitle" class="mt-1 text-sm text-white/70">{{ subtitle }}</p>
         <div v-if="trend !== 0" class="mt-2 flex items-center gap-1 text-sm">
           <span v-if="trend > 0" class="flex items-center text-emerald-300">

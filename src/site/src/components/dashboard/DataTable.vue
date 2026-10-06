@@ -98,8 +98,9 @@ defineExpose({ scrollToBottom })
             <th
               v-for="column in columns"
               :key="column.key"
-              :style="column.width ? { width: column.width } : undefined"
-              class="group cursor-pointer px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 transition-colors hover:text-gray-900"
+              :style="column.width ? { '--col-w': column.width } : undefined"
+              class="group cursor-pointer whitespace-nowrap px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 transition-colors hover:text-gray-900 sm:w-(--col-w) sm:px-6 sm:py-4"
+              :class="{ 'hidden sm:table-cell': column.hideOnMobile }"
               @click="handleSort(column.key)"
             >
               <div class="flex items-center gap-2">
@@ -127,8 +128,8 @@ defineExpose({ scrollToBottom })
             <td
               v-for="column in columns"
               :key="column.key"
-              class="whitespace-nowrap px-6 py-4 text-sm transition-colors"
-              :class="getValueColor(row[column.key], column.key)"
+              class="px-3 py-3 text-sm text-pretty transition-colors sm:whitespace-nowrap sm:px-6 sm:py-4"
+              :class="[getValueColor(row[column.key], column.key), { 'hidden sm:table-cell': column.hideOnMobile }]"
             >
               <span v-if="column.key === 'id'" class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-100 text-xs font-bold text-indigo-600">
                 {{ row[column.key] }}
@@ -136,7 +137,7 @@ defineExpose({ scrollToBottom })
               <span v-else-if="column.key === 'status'" class="inline-flex rounded-full px-2 py-1 text-xs font-medium" :class="getStatusClass(String(row[column.key]))">
                 {{ row[column.key] }}
               </span>
-              <span v-else-if="column.key === 'price' || column.key === 'total'" :class="getValueColor(row[column.key], column.key)">
+              <span v-else-if="column.key === 'price' || column.key === 'total'" class="whitespace-nowrap" :class="getValueColor(row[column.key], column.key)">
                 ¥{{ formatNumber(row[column.key]) }}
               </span>
               <span v-else>{{ formatNumber(row[column.key]) }}</span>

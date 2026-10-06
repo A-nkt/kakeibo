@@ -78,7 +78,7 @@ const variableTableColumns = [
   { key: 'created_date', label: '登録日', width: '120px' },
   { key: 'item_name', label: 'カテゴリ', width: '150px' },
   { key: 'price', label: '金額', width: '120px' },
-  { key: 'memo', label: 'メモ', width: '150px' },
+  { key: 'memo', label: 'メモ', width: '150px', hideOnMobile: true },
 ]
 
 const fixedTableColumns = [
@@ -266,7 +266,8 @@ const categoryPieData = computed(() => {
 
 const statsGridClass = computed(() => {
   if (stats.value.length === 3) {
-    return 'grid-cols-1 sm:grid-cols-3'
+    // sm(640px) で3列にすると金額が折り返すため md から並べる
+    return 'grid-cols-1 md:grid-cols-3'
   }
   return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'
 })
@@ -360,7 +361,7 @@ const handleSubmit = async () => {
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
               </div>
-              <span class="hidden sm:inline">{{ userEmail }}</span>
+              <span class="hidden max-w-[16rem] truncate sm:inline">{{ userEmail }}</span>
               <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
               </svg>
@@ -400,7 +401,8 @@ const handleSubmit = async () => {
       </div>
     </header>
 
-    <main class="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:px-8">
+    <!-- lg 未満は縦スクロールなので、末尾の一覧が FAB に隠れないよう下余白を確保する -->
+    <main class="mx-auto max-w-7xl px-4 pt-4 pb-24 sm:px-6 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:px-8 lg:pb-4">
       <!-- Stats Grid -->
       <div
         class="mb-4 grid flex-shrink-0 gap-3"
@@ -451,9 +453,10 @@ const handleSubmit = async () => {
           class="animate-slide-up flex flex-col rounded-2xl border border-white/50 bg-white/80 p-4 shadow-lg backdrop-blur-sm transition-shadow hover:shadow-xl lg:min-h-0"
           :style="{ animationDelay: '400ms' }"
         >
-          <div class="mb-2 flex flex-shrink-0 items-center justify-between">
-            <h2 class="text-base font-semibold text-gray-800">コスト推移</h2>
-            <div class="flex items-center gap-2">
+          <div class="mb-2 flex flex-shrink-0 flex-wrap items-center justify-between gap-2">
+            <h2 class="whitespace-nowrap text-base font-semibold text-gray-800">コスト推移</h2>
+            <!-- スマホ幅で見出しと並ばないときは次の行の右寄せに回す -->
+            <div class="ml-auto flex items-center gap-2 whitespace-nowrap">
               <!-- 期間切り替え（棒グラフのみ） -->
               <div v-if="chartType === 'bar'" class="flex gap-1 rounded-lg bg-gray-100 p-1">
                 <div class="group relative">
@@ -548,9 +551,11 @@ const handleSubmit = async () => {
               :stacked="false"
             />
             <!-- 円グラフ（カテゴリ別） -->
-            <div v-else class="flex h-full flex-col items-center justify-center">
+            <!-- lg 未満は親の高さが不定なので、凡例を下に置いても円が潰れない高さを明示する -->
+            <div v-else class="flex h-[360px] flex-col items-center justify-center lg:h-full">
               <p class="mb-2 text-sm text-gray-500">カテゴリ別支出内訳</p>
               <PieChart
+                class="min-h-0 flex-1"
                 :labels="categoryPieData.labels"
                 :data="categoryPieData.data"
                 :show-legend="true"

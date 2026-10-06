@@ -482,13 +482,13 @@ const goBack = () => {
         <button
           @click="activeTab = 'variable'"
           :class="[
-            'relative z-10 flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-300',
+            'relative z-10 flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-2 py-2.5 text-sm font-semibold transition-all duration-300 sm:gap-2 sm:px-3',
             activeTab === 'variable'
               ? 'text-white'
               : 'text-gray-500 hover:text-gray-700'
           ]"
         >
-          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="hidden h-4 w-4 sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
           </svg>
           <span>変動費</span>
@@ -507,13 +507,13 @@ const goBack = () => {
         <button
           @click="activeTab = 'fixed'"
           :class="[
-            'relative z-10 flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-300',
+            'relative z-10 flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-2 py-2.5 text-sm font-semibold transition-all duration-300 sm:gap-2 sm:px-3',
             activeTab === 'fixed'
               ? 'text-white'
               : 'text-gray-500 hover:text-gray-700'
           ]"
         >
-          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="hidden h-4 w-4 sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
           <span>固定費</span>
@@ -532,13 +532,13 @@ const goBack = () => {
         <button
           @click="activeTab = 'categories'"
           :class="[
-            'relative z-10 flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-300',
+            'relative z-10 flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-2 py-2.5 text-sm font-semibold transition-all duration-300 sm:gap-2 sm:px-3',
             activeTab === 'categories'
               ? 'text-white'
               : 'text-gray-500 hover:text-gray-700'
           ]"
         >
-          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="hidden h-4 w-4 sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
           </svg>
           <span>カテゴリ</span>
@@ -770,8 +770,8 @@ const goBack = () => {
                 <thead class="sticky top-0 z-10">
                   <tr class="bg-gradient-to-r from-gray-50 to-gray-100">
                     <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 sm:px-6">項目名</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 sm:px-6" style="width: 160px">金額</th>
-                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-600 sm:px-6" style="width: 100px"></th>
+                    <th class="w-28 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 sm:w-40 sm:px-6">金額</th>
+                    <th class="w-24 px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-600 sm:w-[100px] sm:px-6"></th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
@@ -781,7 +781,7 @@ const goBack = () => {
                     class="group transition-colors hover:bg-indigo-50/30"
                   >
                     <td class="px-4 py-3 text-sm font-medium text-gray-800 sm:px-6">{{ item.name || '固定費' }}</td>
-                    <td class="px-4 py-3 text-sm text-gray-600 sm:px-6">¥{{ item.price.toLocaleString() }}</td>
+                    <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-600 sm:px-6">¥{{ item.price.toLocaleString() }}</td>
                     <td class="px-4 py-3 text-right sm:px-6">
                       <div class="flex items-center justify-end gap-1">
                         <button
