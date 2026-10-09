@@ -119,6 +119,12 @@ Resources:
             RestApiId: !Ref Api
             Path: /api/v1/category/update
             Method: PUT
+        CategoryReorder:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /api/v1/category/reorder
+            Method: PUT
         BudgetRegister:
           Type: Api
           Properties:

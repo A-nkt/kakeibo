@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { VueDraggable } from 'vue-draggable-plus'
 import { useAuth } from '@/composables/useAuth'
 import { useItemsStore } from '@/stores/items'
-import { useCategoriesStore } from '@/stores/categories'
+import { useCategoriesStore, type Category } from '@/stores/categories'
 import { useBudgetStore } from '@/stores/budget'
 
 const router = useRouter()
@@ -263,6 +264,15 @@ const handleDelete = async () => {
     } catch (e) {
       alert(e instanceof Error ? e.message : '削除に失敗しました')
     }
+  }
+}
+
+const handleReorderCategories = async (reordered: Category[]) => {
+  if (!customerId.value) return
+  try {
+    await categoriesStore.reorderCategories(customerId.value, reordered)
+  } catch (e) {
+    alert(e instanceof Error ? e.message : '並び替えに失敗しました')
   }
 }
 
@@ -850,7 +860,25 @@ const goBack = () => {
                     <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-600 sm:px-6" style="width: 100px"></th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-100">
+                <tbody v-if="categories.length === 0">
+                  <tr>
+                    <td colspan="2" class="px-6 py-8 text-center">
+                      <span class="text-sm text-gray-400">登録されたカテゴリはありません</span>
+                    </td>
+                  </tr>
+                </tbody>
+                <!-- ハンドルを掴んだときだけドラッグさせ、スマホでの縦スクロールと競合させない -->
+                <VueDraggable
+                  v-else
+                  :model-value="categories"
+                  tag="tbody"
+                  handle=".category-drag-handle"
+                  :animation="150"
+                  ghost-class="opacity-40"
+                  :disabled="categoriesStore.isReordering"
+                  class="divide-y divide-gray-100"
+                  @update:model-value="handleReorderCategories"
+                >
                   <tr
                     v-for="category in categories"
                     :key="category.category_id"
@@ -858,6 +886,20 @@ const goBack = () => {
                   >
                     <td class="px-4 py-3 sm:px-6">
                       <div class="flex items-center gap-3">
+                        <span
+                          class="category-drag-handle -ml-1.5 shrink-0 touch-none cursor-grab rounded-md p-1 text-gray-300 transition-colors hover:bg-gray-100 hover:text-gray-500 active:cursor-grabbing"
+                          title="ドラッグして並び替え"
+                          aria-hidden="true"
+                        >
+                          <svg class="block h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                            <circle cx="9" cy="6" r="1.5" />
+                            <circle cx="15" cy="6" r="1.5" />
+                            <circle cx="9" cy="12" r="1.5" />
+                            <circle cx="15" cy="12" r="1.5" />
+                            <circle cx="9" cy="18" r="1.5" />
+                            <circle cx="15" cy="18" r="1.5" />
+                          </svg>
+                        </span>
                         <div class="hidden h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 text-white sm:flex">
                           <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
@@ -887,12 +929,7 @@ const goBack = () => {
                       </div>
                     </td>
                   </tr>
-                  <tr v-if="categories.length === 0">
-                    <td colspan="2" class="px-6 py-8 text-center">
-                      <span class="text-sm text-gray-400">登録されたカテゴリはありません</span>
-                    </td>
-                  </tr>
-                </tbody>
+                </VueDraggable>
               </table>
             </div>
           </div>

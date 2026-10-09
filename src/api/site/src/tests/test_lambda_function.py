@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from botocore.exceptions import ClientError
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -241,6 +242,79 @@ def test_update_category_success(mock_table, context):
     body = json.loads(response['body'])
     assert body['result']['updated'] is True
     mock_table.update_item.assert_called_once()
+
+
+@patch('app.lambda_function.category_table')
+def test_reorder_categories_success(mock_table, context):
+    mock_table.update_item.return_value = {}
+
+    event = build_apigw_event(
+        'PUT',
+        '/api/v1/category/reorder',
+        body={'customer_id': 'cust-1', 'category_ids': ['cat-3', 'cat-1', 'cat-2']},
+    )
+    response = lambda_handler(event, context)
+
+    assert response['statusCode'] == 200
+    body = json.loads(response['body'])
+    assert body['result']['updated'] is True
+    calls = mock_table.update_item.call_args_list
+    assert [c.kwargs['Key']['category_id'] for c in calls] == ['cat-3', 'cat-1', 'cat-2']
+    assert [c.kwargs['ExpressionAttributeValues'][':sort_order'] for c in calls] == [0, 1, 2]
+
+
+@patch('app.lambda_function.category_table')
+def test_reorder_categories_skips_deleted_category(mock_table, context):
+    conditional_error = ClientError(
+        {'Error': {'Code': 'ConditionalCheckFailedException', 'Message': 'not found'}},
+        'UpdateItem',
+    )
+    mock_table.update_item.side_effect = [{}, conditional_error, {}]
+
+    event = build_apigw_event(
+        'PUT',
+        '/api/v1/category/reorder',
+        body={'customer_id': 'cust-1', 'category_ids': ['cat-1', 'cat-deleted', 'cat-2']},
+    )
+    response = lambda_handler(event, context)
+
+    assert response['statusCode'] == 200
+    assert mock_table.update_item.call_count == 3
+
+
+@patch('app.lambda_function.category_table')
+def test_reorder_categories_database_error(mock_table, context):
+    mock_table.update_item.side_effect = ClientError(
+        {'Error': {'Code': 'ProvisionedThroughputExceededException', 'Message': 'throttled'}},
+        'UpdateItem',
+    )
+
+    event = build_apigw_event(
+        'PUT',
+        '/api/v1/category/reorder',
+        body={'customer_id': 'cust-1', 'category_ids': ['cat-1', 'cat-2']},
+    )
+    response = lambda_handler(event, context)
+
+    assert response['statusCode'] == 502
+
+
+@pytest.mark.parametrize(
+    'body',
+    [
+        {'customer_id': 'cust-1'},
+        {'customer_id': 'cust-1', 'category_ids': 'cat-1'},
+        {'customer_id': 'cust-1', 'category_ids': ['cat-1', 1]},
+        {'customer_id': 'cust-1', 'category_ids': ['cat-1', 'cat-1']},
+    ],
+)
+@patch('app.lambda_function.category_table')
+def test_reorder_categories_invalid_request(mock_table, context, body):
+    event = build_apigw_event('PUT', '/api/v1/category/reorder', body=body)
+    response = lambda_handler(event, context)
+
+    assert response['statusCode'] == 400
+    mock_table.update_item.assert_not_called()
 
 
 # --------------------------------------------------------------------------------------------------

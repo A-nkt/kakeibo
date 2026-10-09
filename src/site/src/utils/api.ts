@@ -164,6 +164,26 @@ export async function updateCategory(customerId: string, categoryId: string, nam
   return response.json()
 }
 
+export async function reorderCategories(customerId: string, categoryIds: string[]) {
+  const response = await fetch(`${API_BASE_URL}/api/v1/category/reorder`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      category_ids: categoryIds,
+    }),
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json()
+    throw new Error(errorData.message || 'カテゴリの並び替えに失敗しました')
+  }
+
+  return response.json()
+}
+
 // Budget API
 export async function getBudget(customerId: string) {
   const response = await fetch(`${API_BASE_URL}/api/v1/customer/budget?customer_id=${encodeURIComponent(customerId)}`)

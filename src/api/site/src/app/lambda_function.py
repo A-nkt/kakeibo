@@ -345,6 +345,61 @@ def update_category() -> Response[str]:
         return response_error(500, 'Internal server error')
 
 
+@app.put('/api/v1/category/reorder')
+def reorder_categories() -> Response[str]:
+    try:
+        body = app.current_event.json_body
+        logger.info('PUT category reorder request received', extra={'request_body': body})
+
+        required_fields = ['customer_id', 'category_ids']
+        for field in required_fields:
+            if field not in body:
+                logger.warning('Missing required field', extra={'field': field})
+                return response_error(400, f'Missing required field: {field}')
+
+        category_ids = body['category_ids']
+        if not isinstance(category_ids, list) or not all(isinstance(cid, str) for cid in category_ids):
+            return response_error(400, 'category_ids must be a list of strings')
+        if len(set(category_ids)) != len(category_ids):
+            return response_error(400, 'category_ids must not contain duplicates')
+
+        now = int(datetime.utcnow().timestamp())
+
+        # 配列の並び順をそのまま sort_order として保存する
+        for sort_order, category_id in enumerate(category_ids):
+            try:
+                category_table.update_item(
+                    Key={
+                        'customer_id': body['customer_id'],
+                        'category_id': category_id
+                    },
+                    UpdateExpression='SET sort_order = :sort_order, updated = :updated',
+                    # 並び替え中に削除されたカテゴリを update_item で作り直さないようにする
+                    ConditionExpression='attribute_exists(category_id)',
+                    ExpressionAttributeValues={
+                        ':sort_order': sort_order,
+                        ':updated': now
+                    }
+                )
+            except ClientError as e:
+                if e.response['Error']['Code'] != 'ConditionalCheckFailedException':
+                    raise
+                logger.warning('Category not found, skipped', extra={'category_id': category_id})
+
+        logger.info('Categories reordered successfully', extra={'count': len(category_ids)})
+        return response_result(result={'updated': True})
+
+    except json.JSONDecodeError as e:
+        logger.error('JSON decode error', extra={'error': str(e)})
+        return response_error(400, 'Invalid JSON')
+    except ClientError as e:
+        logger.error('DynamoDB error', extra={'error': str(e)})
+        return response_error(502, 'Database error')
+    except Exception as e:
+        logger.error('Internal server error', extra={'error': str(e)})
+        return response_error(500, 'Internal server error')
+
+
 # --------------------------------------------------------------------------------------------------
 # Customer Budget API
 # --------------------------------------------------------------------------------------------------
