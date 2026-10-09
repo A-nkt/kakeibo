@@ -96,6 +96,7 @@ All routes are defined in `src/api/site/src/app/lambda_function.py` and served t
 - `POST /category/regist` — register category
 - `GET /category/list?customer_id=` — list categories
 - `PUT /category/update` — update category
+- `PUT /category/reorder` — save display order (`category_ids` array → `sort_order`)
 - `DELETE /category/delete` — delete category
 
 ### Customer
