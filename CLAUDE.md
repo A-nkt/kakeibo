@@ -109,8 +109,7 @@ All routes are defined in `src/api/site/src/app/lambda_function.py` and served t
 - Frontend env vars use `VITE_` prefix (see `src/site/.env.example`)
   - Required: `VITE_COGNITO_USER_POOL_ID`, `VITE_COGNITO_CLIENT_ID`, `VITE_COGNITO_DOMAIN`, `VITE_COGNITO_REDIRECT_URI`, `VITE_API_BASE_URL`
 - `customer_id` is used as the partition key across all DynamoDB tables; derived from the authenticated user's email stored in localStorage
-- Receipt analysis calls the Anthropic API (`anthropic` SDK, model from `ANTHROPIC_MODEL` env, default `claude-opus-5-5`). The API key is read at runtime from SSM Parameter Store (`/{env}/app/site/anthropic-api-key`, SecureString recommended); register it before deploying:
-  `aws ssm put-parameter --name /dev/app/site/anthropic-api-key --value sk-ant-... --type SecureString --profile private_dev --region ap-northeast-1`
+- Receipt analysis calls Claude through Amazon Bedrock (`anthropic[bedrock]` SDK, `AnthropicBedrock` client, auth via the Lambda execution role). Model ID comes from `BEDROCK_MODEL_ID` (inference-profile form, default `global.anthropic.claude-opus-4-6-v1`); newer models (Opus 5.5 etc.) need model access granted on the AWS account first. Server-side fallback is not available on Bedrock
 - `src/api/site/deploy.sh` runs `sam build --use-container` (Docker required) so `src/requirements.txt` dependencies are bundled for arm64
 - SAM stack naming convention: `{env}-app-{category}-{app}-{region}`
 - DynamoDB table naming: `{env}-app-{tablename}-table`

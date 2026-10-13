@@ -86,18 +86,16 @@ def normalize_result(data: dict[str, Any], categories: list[dict[str, Any]]) -> 
 
 def analyze_receipt(image_base64: str, media_type: str, categories: list[dict[str, Any]]) -> dict[str, Any]:
     client = get_anthropic_client()
-    response = client.beta.messages.create(
-        model=Const.ANTHROPIC_MODEL,
+    response = client.messages.create(
+        model=Const.BEDROCK_MODEL_ID,
         max_tokens=4096,
         system=SYSTEM_PROMPT,
         messages=[{'role': 'user', 'content': build_user_content(image_base64, media_type, categories)}],
+        thinking={'type': 'adaptive'},
         output_config={
             'effort': 'medium',
             'format': {'type': 'json_schema', 'schema': RECEIPT_SCHEMA},
         },
-        # 安全分類器による拒否時はサーバー側で別モデルにフォールバックする
-        betas=['server-side-fallback-2026-07-01'],
-        fallbacks='default',
     )
     logger.info(
         'Receipt analyzed',

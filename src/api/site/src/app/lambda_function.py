@@ -20,7 +20,6 @@ from app.values import Const
 from app.receipt import ALLOWED_MEDIA_TYPES, MAX_IMAGE_BASE64_LENGTH, analyze_receipt
 from app.utils import response_result, response_error
 from app.utils.aws import get_aws_boto3_resource
-from app.utils.anthropic_client import reset_anthropic_client
 
 
 logger = Logger()
@@ -252,15 +251,10 @@ def analyze_receipt_image() -> Response[str]:
     except ValueError as e:
         logger.warning('Receipt analysis rejected', extra={'error': str(e)})
         return response_error(422, str(e))
-    except RuntimeError as e:
-        # API キーが SSM に未登録など、環境設定の不備
-        logger.error('AI service not configured', extra={'error': str(e)})
-        return response_error(503, 'AI 機能が設定されていません')
-    except anthropic.AuthenticationError as e:
-        # キーが無効。SSM の値が更新された可能性があるのでキャッシュを捨てて次回読み直す
-        reset_anthropic_client()
-        logger.error('Anthropic authentication failed', extra={'error': str(e)})
-        return response_error(502, 'AI の認証に失敗しました。API キーの設定を確認してください')
+    except (anthropic.PermissionDeniedError, anthropic.NotFoundError) as e:
+        # Bedrock のモデルアクセス未許可・ユースケースフォーム未提出・IAM 権限不足など
+        logger.error('Bedrock model access denied', extra={'error': str(e)})
+        return response_error(503, 'AI モデルへのアクセスが許可されていません')
     except anthropic.RateLimitError as e:
         logger.error('Anthropic rate limited', extra={'error': str(e)})
         return response_error(429, 'AI の利用上限に達しました。しばらく待って再試行してください')

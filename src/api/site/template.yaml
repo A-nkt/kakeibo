@@ -26,8 +26,8 @@ Globals:
         ITEM_TABLE_NAME: !Sub '${Environment}-app-item-table'
         CATEGORY_TABLE_NAME: !Sub '${Environment}-app-category-table'
         CUSTOMER_TABLE_NAME: !Sub '${Environment}-app-customers-table'
-        ANTHROPIC_API_KEY_PARAMETER: !Sub '/${Environment}/app/${AppName}/anthropic-api-key'
-        ANTHROPIC_MODEL: claude-opus-5-5
+        BEDROCK_REGION: !Ref AWS::Region
+        BEDROCK_MODEL_ID: global.anthropic.claude-opus-4-6-v1
 
 Resources:
   FunctionRole:
@@ -60,15 +60,17 @@ Resources:
                   - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Environment}-app-item-table'
                   - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Environment}-app-category-table'
                   - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Environment}-app-customers-table'
-        - PolicyName: SsmParameterAccess
+        - PolicyName: BedrockInvokeAccess
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
+              # global. 推論プロファイルは他リージョンへルーティングされるため foundation-model はリージョンを限定しない
               - Effect: Allow
                 Action:
-                  - ssm:GetParameter
+                  - bedrock:InvokeModel
                 Resource:
-                  - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${Environment}/app/${AppName}/anthropic-api-key'
+                  - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/*.anthropic.claude-*'
+                  - 'arn:aws:bedrock:*::foundation-model/anthropic.claude-*'
 
   Function:
     Type: AWS::Serverless::Function

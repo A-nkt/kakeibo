@@ -238,48 +238,17 @@ def test_analyze_receipt_rejected(mock_category_table, mock_analyze, context):
     assert json.loads(response['body'])['message'] == '画像の解析が拒否されました'
 
 
-@patch('app.lambda_function.analyze_receipt', side_effect=RuntimeError('SSM parameter not found'))
-@patch('app.lambda_function.category_table')
-def test_analyze_receipt_not_configured(mock_category_table, mock_analyze, context):
-    mock_category_table.query.return_value = {'Items': []}
-
-    event = build_apigw_event(
-        'POST',
-        '/api/v1/item/analyze-receipt',
-        body={'customer_id': 'cust-1', 'image': 'aGVsbG8=', 'media_type': 'image/jpeg'},
-    )
-    response = lambda_handler(event, context)
-
-    assert response['statusCode'] == 503
-
-
-@patch('app.utils.anthropic_client.boto3')
-def test_get_anthropic_api_key_missing_parameter(mock_boto3):
-    from app.utils.anthropic_client import get_anthropic_api_key
-
-    get_anthropic_api_key.cache_clear()
-    mock_boto3.client.return_value.get_parameter.side_effect = ClientError(
-        {'Error': {'Code': 'ParameterNotFound', 'Message': 'not found'}}, 'GetParameter'
-    )
-
-    with patch('app.utils.anthropic_client.Const') as mock_const:
-        mock_const.ANTHROPIC_API_KEY_PARAMETER = '/dev/app/site/anthropic-api-key'
-        with pytest.raises(RuntimeError):
-            get_anthropic_api_key()
-    get_anthropic_api_key.cache_clear()
-
-
-@patch('app.lambda_function.reset_anthropic_client')
+@pytest.mark.parametrize('error_name, status', [('PermissionDeniedError', 403), ('NotFoundError', 404)])
 @patch('app.lambda_function.analyze_receipt')
 @patch('app.lambda_function.category_table')
-def test_analyze_receipt_authentication_error_resets_client(mock_category_table, mock_analyze, mock_reset, context):
+def test_analyze_receipt_model_access_denied(mock_category_table, mock_analyze, context, error_name, status):
     import anthropic
     import httpx2 as httpx
 
     mock_category_table.query.return_value = {'Items': []}
-    mock_analyze.side_effect = anthropic.AuthenticationError(
-        'invalid key',
-        response=httpx.Response(401, request=httpx.Request('POST', 'https://api.anthropic.com/v1/messages')),
+    mock_analyze.side_effect = getattr(anthropic, error_name)(
+        'model not available',
+        response=httpx.Response(status, request=httpx.Request('POST', 'https://bedrock-runtime.ap-northeast-1.amazonaws.com')),
         body=None,
     )
 
@@ -290,8 +259,7 @@ def test_analyze_receipt_authentication_error_resets_client(mock_category_table,
     )
     response = lambda_handler(event, context)
 
-    assert response['statusCode'] == 502
-    mock_reset.assert_called_once()
+    assert response['statusCode'] == 503
 
 
 def test_normalize_result_drops_invalid_items_and_unknown_category():
@@ -326,7 +294,7 @@ def _build_claude_response(text: str, stop_reason: str = 'end_turn'):
     response = MagicMock()
     response.content = [block]
     response.stop_reason = stop_reason
-    response.model = 'claude-opus-5-5'
+    response.model = 'global.anthropic.claude-opus-4-6-v1'
     response.usage.input_tokens = 10
     response.usage.output_tokens = 5
     return response
@@ -347,12 +315,12 @@ def test_analyze_receipt_parses_structured_output(mock_get_client):
         ],
     }
     mock_client = mock_get_client.return_value
-    mock_client.beta.messages.create.return_value = _build_claude_response(json.dumps(payload))
+    mock_client.messages.create.return_value = _build_claude_response(json.dumps(payload))
 
     result = analyze_receipt('aGVsbG8=', 'image/jpeg', RECEIPT_CATEGORIES)
 
     assert result == payload
-    kwargs = mock_client.beta.messages.create.call_args.kwargs
+    kwargs = mock_client.messages.create.call_args.kwargs
     content = kwargs['messages'][0]['content']
     assert content[0]['source'] == {'type': 'base64', 'media_type': 'image/jpeg', 'data': 'aGVsbG8='}
     assert '食費' in content[1]['text']
@@ -364,7 +332,7 @@ def test_analyze_receipt_refusal_raises(mock_get_client):
     from app.receipt import analyze_receipt
 
     mock_client = mock_get_client.return_value
-    mock_client.beta.messages.create.return_value = _build_claude_response('', stop_reason='refusal')
+    mock_client.messages.create.return_value = _build_claude_response('', stop_reason='refusal')
 
     with pytest.raises(ValueError):
         analyze_receipt('aGVsbG8=', 'image/jpeg', RECEIPT_CATEGORIES)
