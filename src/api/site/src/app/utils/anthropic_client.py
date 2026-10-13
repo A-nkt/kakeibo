@@ -26,3 +26,9 @@ def get_anthropic_api_key() -> str:
 def get_anthropic_client() -> anthropic.Anthropic:
     # API Gateway の上限（29秒）に収まるよう、リトライは 1 回・タイムアウトは短めにする
     return anthropic.Anthropic(api_key=get_anthropic_api_key(), timeout=25.0, max_retries=1)
+
+
+def reset_anthropic_client() -> None:
+    """SSM のキーを差し替えた後に古いキーを使い続けないよう、キャッシュを破棄する"""
+    get_anthropic_client.cache_clear()
+    get_anthropic_api_key.cache_clear()

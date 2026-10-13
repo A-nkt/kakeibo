@@ -269,6 +269,31 @@ def test_get_anthropic_api_key_missing_parameter(mock_boto3):
     get_anthropic_api_key.cache_clear()
 
 
+@patch('app.lambda_function.reset_anthropic_client')
+@patch('app.lambda_function.analyze_receipt')
+@patch('app.lambda_function.category_table')
+def test_analyze_receipt_authentication_error_resets_client(mock_category_table, mock_analyze, mock_reset, context):
+    import anthropic
+    import httpx2 as httpx
+
+    mock_category_table.query.return_value = {'Items': []}
+    mock_analyze.side_effect = anthropic.AuthenticationError(
+        'invalid key',
+        response=httpx.Response(401, request=httpx.Request('POST', 'https://api.anthropic.com/v1/messages')),
+        body=None,
+    )
+
+    event = build_apigw_event(
+        'POST',
+        '/api/v1/item/analyze-receipt',
+        body={'customer_id': 'cust-1', 'image': 'aGVsbG8=', 'media_type': 'image/jpeg'},
+    )
+    response = lambda_handler(event, context)
+
+    assert response['statusCode'] == 502
+    mock_reset.assert_called_once()
+
+
 def test_normalize_result_drops_invalid_items_and_unknown_category():
     from app.receipt import normalize_result
 
