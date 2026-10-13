@@ -238,6 +238,37 @@ def test_analyze_receipt_rejected(mock_category_table, mock_analyze, context):
     assert json.loads(response['body'])['message'] == '画像の解析が拒否されました'
 
 
+@patch('app.lambda_function.analyze_receipt', side_effect=RuntimeError('SSM parameter not found'))
+@patch('app.lambda_function.category_table')
+def test_analyze_receipt_not_configured(mock_category_table, mock_analyze, context):
+    mock_category_table.query.return_value = {'Items': []}
+
+    event = build_apigw_event(
+        'POST',
+        '/api/v1/item/analyze-receipt',
+        body={'customer_id': 'cust-1', 'image': 'aGVsbG8=', 'media_type': 'image/jpeg'},
+    )
+    response = lambda_handler(event, context)
+
+    assert response['statusCode'] == 503
+
+
+@patch('app.utils.anthropic_client.boto3')
+def test_get_anthropic_api_key_missing_parameter(mock_boto3):
+    from app.utils.anthropic_client import get_anthropic_api_key
+
+    get_anthropic_api_key.cache_clear()
+    mock_boto3.client.return_value.get_parameter.side_effect = ClientError(
+        {'Error': {'Code': 'ParameterNotFound', 'Message': 'not found'}}, 'GetParameter'
+    )
+
+    with patch('app.utils.anthropic_client.Const') as mock_const:
+        mock_const.ANTHROPIC_API_KEY_PARAMETER = '/dev/app/site/anthropic-api-key'
+        with pytest.raises(RuntimeError):
+            get_anthropic_api_key()
+    get_anthropic_api_key.cache_clear()
+
+
 def test_normalize_result_drops_invalid_items_and_unknown_category():
     from app.receipt import normalize_result
 

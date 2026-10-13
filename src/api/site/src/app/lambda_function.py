@@ -251,6 +251,10 @@ def analyze_receipt_image() -> Response[str]:
     except ValueError as e:
         logger.warning('Receipt analysis rejected', extra={'error': str(e)})
         return response_error(422, str(e))
+    except RuntimeError as e:
+        # API キーが SSM に未登録など、環境設定の不備
+        logger.error('AI service not configured', extra={'error': str(e)})
+        return response_error(503, 'AI 機能が設定されていません')
     except anthropic.RateLimitError as e:
         logger.error('Anthropic rate limited', extra={'error': str(e)})
         return response_error(429, 'AI の利用上限に達しました。しばらく待って再試行してください')

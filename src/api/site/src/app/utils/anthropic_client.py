@@ -2,6 +2,7 @@ from functools import lru_cache
 
 import anthropic
 import boto3
+from botocore.exceptions import ClientError
 
 from app.values import Const
 
@@ -12,7 +13,12 @@ def get_anthropic_api_key() -> str:
     if not Const.ANTHROPIC_API_KEY_PARAMETER:
         raise RuntimeError('ANTHROPIC_API_KEY_PARAMETER is not configured')
     ssm = boto3.client('ssm')
-    response = ssm.get_parameter(Name=Const.ANTHROPIC_API_KEY_PARAMETER, WithDecryption=True)
+    try:
+        response = ssm.get_parameter(Name=Const.ANTHROPIC_API_KEY_PARAMETER, WithDecryption=True)
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'ParameterNotFound':
+            raise RuntimeError(f'SSM parameter not found: {Const.ANTHROPIC_API_KEY_PARAMETER}') from e
+        raise
     return response['Parameter']['Value']
 
 
