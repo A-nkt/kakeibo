@@ -8,4 +8,8 @@ AppName=$(get_app_name)
 _PARAMS=("Environment=${Environment}" "CategoryName=${CategoryName}" "AppName=${AppName}")
 
 check_and_set_env_region $1
+
+# anthropic SDK など requirements.txt の依存を Lambda (arm64) 向けにビルドする（Docker が必要）
+cd "$(dirname "$0")"
+sam build --use-container
 deploy

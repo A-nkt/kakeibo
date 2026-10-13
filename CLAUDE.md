@@ -91,6 +91,7 @@ All routes are defined in `src/api/site/src/app/lambda_function.py` and served t
 - `GET /item/list?customer_id=` — list items
 - `PUT /item/update` — update item
 - `DELETE /item/delete` — delete item
+- `POST /item/analyze-receipt` — analyze a receipt image with Claude (body: `customer_id`, `image` base64, `media_type`) and return item candidates with suggested `category_id`
 
 ### Categories
 - `POST /category/regist` — register category
@@ -108,5 +109,8 @@ All routes are defined in `src/api/site/src/app/lambda_function.py` and served t
 - Frontend env vars use `VITE_` prefix (see `src/site/.env.example`)
   - Required: `VITE_COGNITO_USER_POOL_ID`, `VITE_COGNITO_CLIENT_ID`, `VITE_COGNITO_DOMAIN`, `VITE_COGNITO_REDIRECT_URI`, `VITE_API_BASE_URL`
 - `customer_id` is used as the partition key across all DynamoDB tables; derived from the authenticated user's email stored in localStorage
+- Receipt analysis calls the Anthropic API (`anthropic` SDK, model from `ANTHROPIC_MODEL` env, default `claude-opus-5-5`). The API key is read at runtime from SSM Parameter Store (`/{env}/app/site/anthropic-api-key`, SecureString recommended); register it before deploying:
+  `aws ssm put-parameter --name /dev/app/site/anthropic-api-key --value sk-ant-... --type SecureString --profile private_dev --region ap-northeast-1`
+- `src/api/site/deploy.sh` runs `sam build --use-container` (Docker required) so `src/requirements.txt` dependencies are bundled for arm64
 - SAM stack naming convention: `{env}-app-{category}-{app}-{region}`
 - DynamoDB table naming: `{env}-app-{tablename}-table`

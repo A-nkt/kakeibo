@@ -10,6 +10,7 @@ import BarChart from '@/components/dashboard/BarChart.vue'
 import PieChart from '@/components/dashboard/PieChart.vue'
 import StatCard from '@/components/dashboard/StatCard.vue'
 import AiComment from '@/components/dashboard/AiComment.vue'
+import ReceiptScanner, { type ReceiptRegisterEntry } from '@/components/dashboard/ReceiptScanner.vue'
 import { useExpenseAnalysis } from '@/composables/useExpenseAnalysis'
 
 const router = useRouter()
@@ -32,6 +33,8 @@ const isUserMenuOpen = ref(false)
 const dataTableRef = ref<InstanceType<typeof DataTable> | null>(null)
 
 const isSlideOverOpen = ref(false)
+const entryMode = ref<'manual' | 'receipt'>('manual')
+const receiptScannerRef = ref<InstanceType<typeof ReceiptScanner> | null>(null)
 const isSubmitting = ref(false)
 const showSuccess = ref(false)
 const selectedProduct = ref('')
@@ -307,6 +310,29 @@ const openSlideOver = () => {
 const closeSlideOver = () => {
   isSlideOverOpen.value = false
   showSuccess.value = false
+  receiptScannerRef.value?.reset()
+}
+
+const handleReceiptRegister = async (entries: ReceiptRegisterEntry[]) => {
+  isSubmitting.value = true
+
+  try {
+    const customerId = currentUser.value?.email || 'anonymous'
+    await itemsStore.addItems(customerId, entries)
+
+    showSuccess.value = true
+    receiptScannerRef.value?.reset()
+
+    setTimeout(() => {
+      showSuccess.value = false
+      closeSlideOver()
+    }, 1500)
+  } catch (error) {
+    console.error('Receipt registration error:', error)
+    alert(error instanceof Error ? error.message : '登録に失敗しました')
+  } finally {
+    isSubmitting.value = false
+  }
 }
 
 const handleSubmit = async () => {
@@ -707,7 +733,36 @@ const handleSubmit = async () => {
               </div>
             </Transition>
 
-            <form @submit.prevent="handleSubmit" class="space-y-6">
+            <!-- Entry Mode Tabs -->
+            <div class="mb-6 flex rounded-xl bg-gray-100 p-1 text-sm font-medium">
+              <button
+                type="button"
+                class="flex-1 rounded-lg px-3 py-2 transition-all"
+                :class="entryMode === 'manual' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
+                @click="entryMode = 'manual'"
+              >
+                手入力
+              </button>
+              <button
+                type="button"
+                class="flex-1 rounded-lg px-3 py-2 transition-all"
+                :class="entryMode === 'receipt' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
+                @click="entryMode = 'receipt'"
+              >
+                レシート読み取り
+              </button>
+            </div>
+
+            <ReceiptScanner
+              v-if="entryMode === 'receipt'"
+              ref="receiptScannerRef"
+              :categories="products"
+              :customer-id="userEmail"
+              :is-registering="isSubmitting"
+              @register="handleReceiptRegister"
+            />
+
+            <form v-else @submit.prevent="handleSubmit" class="space-y-6">
               <!-- Product Select -->
               <div>
                 <label for="product" class="mb-2 block text-sm font-medium text-gray-700">
@@ -781,6 +836,7 @@ const handleSubmit = async () => {
                 キャンセル
               </button>
               <button
+                v-if="entryMode === 'manual'"
                 type="button"
                 @click="handleSubmit"
                 :disabled="!isFormValid || isSubmitting"

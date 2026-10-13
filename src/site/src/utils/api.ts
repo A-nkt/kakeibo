@@ -215,3 +215,45 @@ export async function registBudget(customerId: string, budget: number) {
 
   return response.json()
 }
+
+// Receipt Analyze API
+export interface ReceiptAnalyzeItem {
+  name: string
+  price: number
+  category_id: string | null
+}
+
+export interface ReceiptAnalyzeResult {
+  is_receipt: boolean
+  store_name: string | null
+  purchased_date: string | null
+  total: number | null
+  items: ReceiptAnalyzeItem[]
+}
+
+export async function analyzeReceipt(params: {
+  customerId: string
+  imageBase64: string
+  mediaType: string
+  signal?: AbortSignal
+}): Promise<{ result: ReceiptAnalyzeResult }> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/item/analyze-receipt`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      customer_id: params.customerId,
+      image: params.imageBase64,
+      media_type: params.mediaType,
+    }),
+    signal: params.signal,
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    throw new Error(errorData.message || 'レシートの読み取りに失敗しました')
+  }
+
+  return response.json()
+}
