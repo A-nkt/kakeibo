@@ -294,7 +294,7 @@ def _build_claude_response(text: str, stop_reason: str = 'end_turn'):
     response = MagicMock()
     response.content = [block]
     response.stop_reason = stop_reason
-    response.model = 'global.anthropic.claude-opus-4-6-v1'
+    response.model = 'global.anthropic.claude-haiku-4-5-20251001-v1:0'
     response.usage.input_tokens = 10
     response.usage.output_tokens = 5
     return response

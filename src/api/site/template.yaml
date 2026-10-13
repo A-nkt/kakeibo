@@ -12,6 +12,17 @@ Parameters:
     Type: String
   AppName:
     Type: String
+  MonthlyBedrockBudgetUsd:
+    Type: Number
+    Default: 10
+    Description: Bedrock の月額上限 (USD)。到達すると Lambda ロールに Bedrock 拒否ポリシーが自動付与される
+  BudgetAlertEmail:
+    Type: String
+    Default: ''
+    Description: 予算アラートの通知先メールアドレス（空なら SNS トピックのみ作成）
+
+Conditions:
+  HasBudgetAlertEmail: !Not [!Equals [!Ref BudgetAlertEmail, '']]
 
 Globals:
   Function:
@@ -27,7 +38,7 @@ Globals:
         CATEGORY_TABLE_NAME: !Sub '${Environment}-app-category-table'
         CUSTOMER_TABLE_NAME: !Sub '${Environment}-app-customers-table'
         BEDROCK_REGION: !Ref AWS::Region
-        BEDROCK_MODEL_ID: global.anthropic.claude-opus-4-6-v1
+        BEDROCK_MODEL_ID: global.anthropic.claude-haiku-4-5-20251001-v1:0
 
 Resources:
   FunctionRole:
@@ -176,7 +187,126 @@ Resources:
         AllowMethods: "'GET, POST, PUT, DELETE, OPTIONS'"
         AllowHeaders: "'Content-Type'"
 
+  # ------------------------------------------------------------------------------------------------
+  # Bedrock コスト上限（AWS Budgets）
+  #   80% 到達: SNS 通知 / 100% 到達: Lambda ロールに Bedrock 拒否ポリシーを自動付与して呼び出しを止める
+  #   ※ 予算の集計はアカウント全体の Bedrock 利用額。反映には最大 8〜12 時間の遅延がある
+  # ------------------------------------------------------------------------------------------------
+  BedrockBudgetAlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${Environment}-${CategoryName}-${AppName}-bedrock-budget-alert'
+
+  BedrockBudgetAlertTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics:
+        - !Ref BedrockBudgetAlertTopic
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: budgets.amazonaws.com
+            Action: sns:Publish
+            Resource: !Ref BedrockBudgetAlertTopic
+
+  BedrockBudgetAlertSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: HasBudgetAlertEmail
+    Properties:
+      TopicArn: !Ref BedrockBudgetAlertTopic
+      Protocol: email
+      Endpoint: !Ref BudgetAlertEmail
+
+  BedrockDenyPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub '${Environment}-${CategoryName}-${AppName}-bedrock-deny'
+      Description: 予算超過時に Budgets Action が Lambda ロールへ付与する Bedrock 拒否ポリシー
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Deny
+            Action:
+              - bedrock:InvokeModel
+              - bedrock:InvokeModelWithResponseStream
+            Resource: '*'
+
+  BudgetsActionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${Environment}-${CategoryName}-${AppName}-budgets-action-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: budgets.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: AttachDenyPolicyToFunctionRole
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - iam:AttachRolePolicy
+                  - iam:DetachRolePolicy
+                  - iam:ListAttachedRolePolicies
+                  - iam:GetRole
+                  - iam:GetPolicy
+                Resource:
+                  - !GetAtt FunctionRole.Arn
+                  - !Ref BedrockDenyPolicy
+
+  BedrockBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: !Sub '${Environment}-${CategoryName}-${AppName}-bedrock-monthly'
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit:
+          Amount: !Ref MonthlyBedrockBudgetUsd
+          Unit: USD
+        CostFilters:
+          Service:
+            - Amazon Bedrock
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 80
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: SNS
+              Address: !Ref BedrockBudgetAlertTopic
+
+  BedrockBudgetStopAction:
+    Type: AWS::Budgets::BudgetsAction
+    Properties:
+      BudgetName: !Ref BedrockBudget
+      ActionType: APPLY_IAM_POLICY
+      NotificationType: ACTUAL
+      ActionThreshold:
+        Type: PERCENTAGE
+        Value: 100
+      ApprovalModel: AUTOMATIC
+      ExecutionRoleArn: !GetAtt BudgetsActionRole.Arn
+      Definition:
+        IamActionDefinition:
+          PolicyArn: !Ref BedrockDenyPolicy
+          Roles:
+            - !Ref FunctionRole
+      Subscribers:
+        - Type: SNS
+          Address: !Ref BedrockBudgetAlertTopic
+
 Outputs:
+  BedrockBudgetAlertTopicArn:
+    Description: Bedrock 予算アラートの SNS トピック
+    Value: !Ref BedrockBudgetAlertTopic
   ApiEndpoint:
     Description: API Gateway endpoint URL
     Value: !Sub 'https://${Api}.execute-api.${AWS::Region}.amazonaws.com'

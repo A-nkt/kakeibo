@@ -91,11 +91,8 @@ def analyze_receipt(image_base64: str, media_type: str, categories: list[dict[st
         max_tokens=4096,
         system=SYSTEM_PROMPT,
         messages=[{'role': 'user', 'content': build_user_content(image_base64, media_type, categories)}],
-        thinking={'type': 'adaptive'},
-        output_config={
-            'effort': 'medium',
-            'format': {'type': 'json_schema', 'schema': RECEIPT_SCHEMA},
-        },
+        # レシート読み取りは思考なしでも精度が変わらないため、低コスト・低レイテンシ優先で thinking は使わない
+        output_config={'format': {'type': 'json_schema', 'schema': RECEIPT_SCHEMA}},
     )
     logger.info(
         'Receipt analyzed',
