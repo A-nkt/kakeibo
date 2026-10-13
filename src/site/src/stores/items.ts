@@ -51,6 +51,31 @@ export const useItemsStore = defineStore('items', () => {
     }
   }
 
+  // レシート読み取りなど複数項目をまとめて登録し、一覧の再取得は 1 回で済ませる
+  async function addItems(
+    customerId: string,
+    entries: { categoryId: string; price: number; memo?: string }[],
+  ) {
+    if (entries.length === 0) return
+
+    isLoading.value = true
+    error.value = null
+
+    try {
+      await Promise.all(
+        entries.map(entry =>
+          registItem({ customerId, itemId: entry.categoryId, price: entry.price, memo: entry.memo }),
+        ),
+      )
+      await fetchItems(customerId)
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : '登録に失敗しました'
+      throw e
+    } finally {
+      isLoading.value = false
+    }
+  }
+
   async function editItem(
     customerId: string,
     itemId: string,
@@ -123,5 +148,5 @@ export const useItemsStore = defineStore('items', () => {
     }
   }
 
-  return { items, isLoading, error, fetchItems, addItem, editItem, addFixedItem, editFixedItem, removeItem }
+  return { items, isLoading, error, fetchItems, addItem, addItems, editItem, addFixedItem, editFixedItem, removeItem }
 })

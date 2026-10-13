@@ -1,6 +1,8 @@
 import json
 import uuid
 
+import anthropic
+
 from typing import Any
 from datetime import datetime
 
@@ -15,6 +17,7 @@ from aws_lambda_powertools.logging.correlation_paths import API_GATEWAY_REST
 from aws_lambda_powertools.utilities.typing import LambdaContext
 
 from app.values import Const
+from app.receipt import ALLOWED_MEDIA_TYPES, MAX_IMAGE_BASE64_LENGTH, analyze_receipt
 from app.utils import response_result, response_error
 from app.utils.aws import get_aws_boto3_resource
 
@@ -203,6 +206,64 @@ def delete_item() -> Response[str]:
         logger.info('Item deleted successfully', extra={'item_id': item_id})
         return response_result(result={'deleted': True})
 
+    except ClientError as e:
+        logger.error('DynamoDB error', extra={'error': str(e)})
+        return response_error(502, 'Database error')
+    except Exception as e:
+        logger.error('Internal server error', extra={'error': str(e)})
+        return response_error(500, 'Internal server error')
+
+
+@app.post('/api/v1/item/analyze-receipt')
+def analyze_receipt_image() -> Response[str]:
+    try:
+        body = app.current_event.json_body
+        logger.info('POST analyze-receipt request received', extra={'customer_id': body.get('customer_id')})
+
+        required_fields = ['customer_id', 'image', 'media_type']
+        for field in required_fields:
+            if field not in body:
+                logger.warning('Missing required field', extra={'field': field})
+                return response_error(400, f'Missing required field: {field}')
+
+        if body['media_type'] not in ALLOWED_MEDIA_TYPES:
+            return response_error(400, f'Unsupported media_type: {body["media_type"]}')
+        image = body['image']
+        if not isinstance(image, str) or not image:
+            return response_error(400, 'image must be a non-empty base64 string')
+        if len(image) > MAX_IMAGE_BASE64_LENGTH:
+            return response_error(413, 'Image is too large')
+
+        # カテゴリ候補の割り当てに使うため、ユーザーのカテゴリ一覧を渡す
+        response = category_table.query(
+            KeyConditionExpression='customer_id = :cid',
+            ExpressionAttributeValues={':cid': body['customer_id']}
+        )
+        categories = response.get('Items', [])
+
+        result = analyze_receipt(image, body['media_type'], categories)
+        logger.info('Receipt analyzed successfully', extra={'item_count': len(result['items'])})
+        return response_result(result=result)
+
+    except json.JSONDecodeError as e:
+        logger.error('JSON decode error', extra={'error': str(e)})
+        return response_error(400, 'Invalid JSON')
+    except ValueError as e:
+        logger.warning('Receipt analysis rejected', extra={'error': str(e)})
+        return response_error(422, str(e))
+    except (anthropic.PermissionDeniedError, anthropic.NotFoundError) as e:
+        # Bedrock のモデルアクセス未許可・ユースケースフォーム未提出・IAM 権限不足など
+        logger.error('Bedrock model access denied', extra={'error': str(e)})
+        return response_error(503, 'AI モデルへのアクセスが許可されていません')
+    except anthropic.RateLimitError as e:
+        logger.error('Anthropic rate limited', extra={'error': str(e)})
+        return response_error(429, 'AI の利用上限に達しました。しばらく待って再試行してください')
+    except anthropic.APIStatusError as e:
+        logger.error('Anthropic API error', extra={'status_code': e.status_code, 'error': str(e)})
+        return response_error(502, 'AI service error')
+    except anthropic.APIConnectionError as e:
+        logger.error('Anthropic connection error', extra={'error': str(e)})
+        return response_error(504, 'AI service unreachable')
     except ClientError as e:
         logger.error('DynamoDB error', extra={'error': str(e)})
         return response_error(502, 'Database error')

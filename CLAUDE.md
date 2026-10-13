@@ -91,6 +91,7 @@ All routes are defined in `src/api/site/src/app/lambda_function.py` and served t
 - `GET /item/list?customer_id=` — list items
 - `PUT /item/update` — update item
 - `DELETE /item/delete` — delete item
+- `POST /item/analyze-receipt` — analyze a receipt image with Claude (body: `customer_id`, `image` base64, `media_type`) and return item candidates with suggested `category_id`
 
 ### Categories
 - `POST /category/regist` — register category
@@ -108,5 +109,8 @@ All routes are defined in `src/api/site/src/app/lambda_function.py` and served t
 - Frontend env vars use `VITE_` prefix (see `src/site/.env.example`)
   - Required: `VITE_COGNITO_USER_POOL_ID`, `VITE_COGNITO_CLIENT_ID`, `VITE_COGNITO_DOMAIN`, `VITE_COGNITO_REDIRECT_URI`, `VITE_API_BASE_URL`
 - `customer_id` is used as the partition key across all DynamoDB tables; derived from the authenticated user's email stored in localStorage
+- Receipt analysis calls Claude through Amazon Bedrock (`anthropic[bedrock]` SDK, `AnthropicBedrock` client, auth via the Lambda execution role). Model ID comes from `BEDROCK_MODEL_ID` (inference-profile form, default `global.anthropic.claude-haiku-4-5-20251001-v1:0`, chosen for cost; no thinking/effort params so it also works on 4.5-generation models). Newer models (5.5 etc.) need model access granted on the AWS account first
+- Bedrock spend is capped by an AWS Budget in `src/api/site/template.yaml` (`MonthlyBedrockBudgetUsd`, default 10 USD): 80% sends an SNS alert, 100% auto-attaches a Bedrock deny policy to the Lambda role. Pass `BUDGET_ALERT_EMAIL=... ./deploy.sh dev` to get email alerts; after the month rolls over, detach the deny policy manually if it was applied
+- `src/api/site/deploy.sh` runs `sam build` (host `python3.13` required, e.g. `brew install python@3.13`) so `src/requirements.txt` dependencies are bundled as manylinux aarch64 wheels. Do not use `--use-container`: the build container's pip cannot verify PyPI's TLS certificate on the corporate network. The script aborts if the build fails so a dependency-less Lambda is never deployed
 - SAM stack naming convention: `{env}-app-{category}-{app}-{region}`
 - DynamoDB table naming: `{env}-app-{tablename}-table`
